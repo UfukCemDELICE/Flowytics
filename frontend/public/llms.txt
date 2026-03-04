@@ -1,0 +1,38 @@
+# Flowytics - AI-Powered CFO for Manufacturers
+
+## About Flowytics
+
+Flowytics is an AI-powered financial intelligence platform designed specifically for manufacturers. Our Agentic CFO helps manufacturing businesses master their cash flow through intelligent visualization, scenario simulation, and automated supplier communications.
+
+## Key Features
+
+### Runway Vision
+Real-time cash flow visualization with AI-powered forecasting. See your financial runway at a glance with up to 18+ months of forecasting accuracy. Monitor your cash position and make informed decisions.
+
+### Agentic Actions  
+AI-powered automation that drafts and sends supplier communications automatically. Our AI assistant handles payment schedule updates, term negotiations, and routine supplier correspondence on your behalf.
+
+### Instant Import
+Drop your CSV files and watch them transform into actionable financial insights. No complex setup required - just import your data and get immediate visibility into your finances.
+
+## Who We Serve
+
+Flowytics is built for:
+- Manufacturing companies managing complex supply chains
+- CFOs and financial controllers seeking better cash flow visibility
+- Operations teams needing to automate supplier communications
+- Businesses wanting AI-powered financial forecasting
+
+## Join Our Waitlist
+
+We're currently in early access. Join 500+ manufacturers already on our waitlist to be among the first to experience the future of manufacturing finance.
+
+Visit [flowytics.io](https://flowytics.io) to join the waitlist.
+
+## Contact
+
+For inquiries, reach us at hello@flowytics.io
+
+---
+
+© 2026 Flowytics. All rights reserved.

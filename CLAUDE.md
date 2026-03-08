@@ -1,199 +1,196 @@
 # Flowytics — Agentic CFO
 
-Agentic Backoffice as a Service. AI-powered CFO that replaces fractional CFOs for early-stage startups. Orchestrates existing tools (QuickBooks, banks) instead of replacing them.
+AI-powered managerial accounting intelligence layer for pre-seed and seed-stage US startups. Reads financial data from existing accounting software and banking sources, delivers proactive CFO-level insights via Slack.
+
+**Core distinction:** Accounting software (QBO, Xero) does financial accounting — recording, categorizing, tax compliance. Flowytics does managerial accounting — analysis, forecasting, decision support for founders. We read their data, we don't replace their tools.
+
+**Tagline:** "Your accounting software has the data. You're missing the CFO."
+
+## Vision & Mission
+
+**Vision:** A world where everyone can start a company and no one has to manage a backoffice.
+
+**Mission:** Eliminate the mandatory friction of running a company — so talented people everywhere can create their own value.
+
+**MVP Goal:** Delay the need for a fractional CFO ($1,500/mo) by providing 80% of the analytical value at $150/mo via Slack.
 
 ## Tech Stack
 
-### Backend (Python — `uv` managed)
-- **Runtime:** Python 3.12
-- **Package manager:** `uv` (all dependencies via `uv add`, no pip)
+### Backend
+- **Runtime:** Python 3.12, managed with `uv`
 - **Framework:** FastAPI + Uvicorn
-- **AI/Agent:** LangGraph (orchestration + deterministic tools) + DSPy (prompt optimization/modular LLM calls)
-- **LLM Models (Anthropic):**
-  - Claude Opus → Advanced financial reasoning, complex analysis
-  - Claude Sonnet → Document and report generation
-  - Claude Haiku → Slack conversations, quick responses
-- **Auth:** Clerk (user management, org management, JWT)
-- **Database:** Supabase (PostgreSQL, database only — no Supabase Auth)
-- **Cache:** Supabase `qb_cache` table with TTL
-- **Async Jobs:** FastAPI BackgroundTasks
+- **ORM:** SQLModel (Pydantic + SQLAlchemy, async via asyncpg)
+- **Agent orchestration:** LangGraph
+- **LLM:** Claude API — Opus 4.6 (rare/complex), Sonnet 4.5 (primary), Haiku 4.5 (Slack chat)
+- **Data processing:** Polars (Rust-based DataFrame library)
+- **JSON:** orjson (Rust-based, default serializer)
+- **Scheduler:** APScheduler (in-process, cron-style jobs)
+- **Auth:** Clerk (JWT verification)
 - **Payments:** Stripe
-- **Data Source:** QuickBooks Online API via `python-quickbooks`
-- **Messaging:** Slack (Bot API for conversational CFO)
-- **Observability:** LangSmith
+- **Integrations:** Codat (accounting, via httpx wrapper — no SDK), Plaid (banking, optional), Slack Bot API
 
 ### Frontend
-- **Framework:** Next.js 14+ (App Router)
-- **Language:** TypeScript (strict mode)
-- **Styling:** Tailwind CSS
-- **Auth:** Clerk (React components + middleware)
-- **Hosting:** Vercel
+- **Framework:** Next.js (App Router, TypeScript strict)
+- **Styling:** Tailwind CSS + shadcn/ui
+- **Auth:** Clerk React components
+- **Scope:** Onboarding wizard ONLY. No web dashboard. Post-onboarding = Slack.
 
 ### Infrastructure
-- **Backend hosting:** Railway
-- **Database:** Supabase (managed PostgreSQL)
+- **Backend:** Railway (single service — API + Slack + Scheduler in one process)
+- **Frontend:** Vercel
+- **Database:** Supabase (managed PostgreSQL, direct connection via asyncpg)
 
 ## Project Structure
 
 ```
 flowytics/
-├── CLAUDE.md
+├── CLAUDE.md                     # This file — read first every session
 ├── pyproject.toml
 ├── uv.lock
 ├── backend/
 │   ├── app/
-│   │   ├── main.py             # FastAPI entrypoint
-│   │   ├── config.py           # Settings via pydantic-settings
-│   │   ├── auth.py             # Clerk JWT verification middleware
-│   │   ├── api/
-│   │   │   └── v1/
-│   │   │       ├── reports.py  # Financial reporting endpoints
-│   │   │       ├── cashflow.py # Cash flow endpoints
-│   │   │       ├── expenses.py # Expense management endpoints
-│   │   │       ├── quickbooks.py # QB OAuth + webhook endpoints
-│   │   │       └── slack.py    # Slack event handler
-│   │   ├── agents/
-│   │   │   ├── orchestrator.py # LangGraph agent graph
-│   │   │   ├── financial_reporting.py
-│   │   │   ├── cashflow.py
-│   │   │   └── expense.py
-│   │   ├── tools/
-│   │   │   ├── ratios.py       # Financial ratio calculations
-│   │   │   ├── runway.py       # Burn rate, runway, cash projections
-│   │   │   ├── budget.py       # Budget vs actual, variance analysis
-│   │   │   ├── anomaly.py      # Z-score anomaly detection
-│   │   │   └── validators.py   # Cross-validation (tool output vs LLM output)
-│   │   ├── integrations/
-│   │   │   ├── quickbooks.py   # QuickBooks API client
-│   │   │   ├── stripe.py       # Stripe billing
-│   │   │   └── slack.py        # Slack Bot client
-│   │   ├── models/             # Pydantic models + DB schemas
-│   │   ├── services/
-│   │   │   ├── financial.py    # Business logic layer
-│   │   │   └── cache.py        # QuickBooks data cache (Supabase-backed)
-│   │   └── utils/
-│   └── tests/
-│       ├── test_tools/         # Deterministic tool tests
-│       ├── test_agents/        # Agent integration tests
-│       └── test_api/           # API endpoint tests
-├── frontend/
-│   ├── src/
-│   │   ├── app/                # Next.js App Router pages
-│   │   ├── components/
-│   │   ├── lib/                # API client, utils, Supabase client
-│   │   └── types/
-│   ├── middleware.ts            # Clerk auth middleware
-│   ├── package.json
-│   └── tsconfig.json
-└── docs/
-    └── architecture.md
+│   │   ├── main.py               # FastAPI app + scheduler startup
+│   │   ├── config.py             # pydantic-settings
+│   │   ├── auth.py               # Clerk JWT middleware
+│   │   ├── database.py           # SQLModel engine + session
+│   │   ├── api/v1/               # API routes (see backend.md)
+│   │   ├── agent/                # LangGraph CFO agent (see agents.md)
+│   │   ├── tools/                # Deterministic financial tools (see agents.md)
+│   │   ├── integrations/         # Codat, Plaid, Slack, Stripe clients
+│   │   ├── models/               # SQLModel DB models + Pydantic schemas
+│   │   ├── services/             # Business logic, sync, scheduler
+│   │   └── prompts/              # Plain text LLM prompt files
+│   └── tests/                    # See testing.md
+├── frontend/                     # See frontend.md
+│   ├── src/app/                  # Next.js pages
+│   ├── src/components/
+│   └── src/lib/
+├── docs/
+│   ├── architecture.md           # System overview, integrations, deployment
+│   ├── backend.md                # Python conventions, FastAPI patterns
+│   ├── agents.md                 # LangGraph agent, tools, model routing
+│   ├── db.md                     # Schema, RLS, migrations, indexes
+│   ├── frontend.md               # Onboarding flow, Clerk, Stripe
+│   └── testing.md                # Test strategy, coverage, sprint reports
+└── alembic/                      # DB migrations (post-MVP)
 ```
+
+## Software Engineering Principles
+
+### KISS — Keep It Simple, Stupid
+- Single FastAPI process handles API + Slack + Scheduler. No microservices.
+- Single LangGraph agent with tools. No multi-agent orchestration.
+- Plain text prompt files. No prompt frameworks (no DSPy).
+- Solve today's problem. Don't architect for 10,000 tenants when you have 0.
+
+### DRY — Don't Repeat Yourself
+- SQLModel models serve as both DB schema AND Pydantic validation models.
+- One data flow path: Integration → DB → Tools → LLM → Slack. No parallel paths.
+- Shared utility functions in `utils/`. No copy-paste across modules.
+
+### SOLID
+- **S — Single Responsibility:** Each tool does one calculation. Each API route handles one resource.
+- **O — Open/Closed:** Tools are extendable (add new tools) without modifying the agent graph.
+- **L — Liskov:** All tools follow the same interface: typed input → typed output.
+- **I — Interface Segregation:** Lean Pydantic models per endpoint. No god-objects.
+- **D — Dependency Inversion:** Agent depends on tool interfaces, not concrete implementations. Integrations accessed via abstract clients.
+
+### YAGNI — You Aren't Gonna Need It
+- No web dashboard until customer feedback demands it.
+- No Xero support until QBO is proven (Codat abstracts this anyway).
+- No multi-currency until a customer needs it.
+- No Alembic migrations until schema changes become frequent.
+
+### Lean Startup
+- Ship the smallest thing that delivers value. Validate with real users.
+- Every feature must answer: "Does this help a founder make a better financial decision?"
+- If the answer is "maybe later" — it's not in MVP.
+
+## ⛔ DESTRUCTIVE OPERATION WARNINGS
+
+**NEVER do these without explicit human confirmation:**
+
+```
+DATABASE:
+- NEVER DROP or TRUNCATE tables
+- NEVER DELETE columns from existing tables
+- NEVER run DELETE without WHERE clause
+- NEVER modify production data directly
+- ALWAYS back up before schema changes
+- ALWAYS test SQL on sandbox/local before production
+
+CREDENTIALS & SECRETS:
+- NEVER delete or overwrite .env files
+- NEVER log API keys, tokens, or secrets to console/files
+- NEVER commit .env or credentials to git
+- NEVER revoke OAuth tokens without user consent
+
+GIT:
+- NEVER force push to main branch
+- NEVER delete remote branches without confirmation
+- NEVER rebase shared branches
+
+INTEGRATIONS:
+- NEVER delete Codat/Plaid connections without user consent
+- NEVER delete Stripe subscriptions programmatically without confirmation
+- NEVER remove Slack bot from workspace without warning
+
+FILE SYSTEM:
+- NEVER rm -rf on project directories
+- NEVER overwrite migration files
+- NEVER delete test data fixtures
+```
+
+**When in doubt: ASK. A 30-second confirmation saves hours of recovery.**
 
 ## Commands
 
 ### Backend
-- `uv sync`: Install all dependencies
-- `uv run fastapi dev backend/app/main.py`: Start dev server
-- `uv run pytest`: Run all tests
-- `uv run pytest tests/test_tools/ -v`: Run deterministic tool tests only
-- `uv add <package>`: Add dependency (NEVER use pip)
+```bash
+uv sync                                    # Install dependencies
+uv run fastapi dev backend/app/main.py     # Dev server
+uv run pytest                              # All tests
+uv run pytest tests/test_tools/ -v         # Tool tests only
+uv run ruff check .                        # Lint
+uv run mypy backend/                       # Type check
+uv add <package>                           # Add dependency (NEVER pip)
+```
 
 ### Frontend
-- `cd frontend && npm install`: Install deps
-- `cd frontend && npm run dev`: Start Next.js dev server (port 3000)
-- `cd frontend && npm run build`: Production build
-- `cd frontend && npm run lint`: Lint check
-
-## Architecture Principles
-
-### Multi-Model Strategy
-Each model is used where it excels. Never use a heavier model when a lighter one suffices:
-- **Opus:** Complex financial reasoning — multi-step analysis, cross-statement insights, strategic recommendations. Used sparingly (expensive).
-- **Sonnet:** Report generation, document creation, structured financial summaries. Primary workhorse.
-- **Haiku:** Slack bot responses, quick Q&A, status checks. Fast and cheap for conversational UI.
-
-Model selection is handled by the Orchestrator based on task complexity, NOT by the user.
-
-### Deterministic Tools + LLM — Separation of Concerns
-Every financial operation flows through the Orchestrator (LangGraph) which routes tasks:
-1. **Deterministic tasks → LangGraph Tools:** All calculations, rule checks, threshold alerts, ratio computations. Pure Python functions, no LLM. These MUST be exact, reproducible, and auditable.
-2. **Interpretive tasks → Claude (via DSPy modules):** Trend analysis, natural language summaries, forecasting, anomaly contextualization. Claude receives tool outputs as grounding context.
-3. **Cross-validation:** If Claude's numeric outputs contradict tool results, always trust the tools. Flag discrepancies in logs.
-
-### Tool Design Rules
-- Every tool is a pure function: same input → same output, always.
-- Every tool has comprehensive Pydantic input/output models.
-- Every tool has unit tests with known financial data.
-- Tools NEVER call the LLM. LLM NEVER does arithmetic.
-- Tools are the moat foundation — the financial rule set grows with every customer.
-
-### Role Separation — DSPy vs LangGraph
-- **LangGraph:** Agent graph, state management, task routing, tool orchestration. Controls the FLOW.
-- **DSPy:** Prompt optimization, modular LLM calls, structured outputs. Controls the QUALITY of each LLM interaction.
-- These do NOT overlap. LangGraph calls DSPy modules as nodes within the graph.
-
-### Auth Flow
-- **Frontend:** Clerk React components handle sign-up/sign-in/org management.
-- **Backend:** Clerk JWT verified on every request via FastAPI middleware in `auth.py`. User ID extracted from JWT claims.
-- **Database:** Supabase tables use `clerk_user_id` column. RLS policies filter by this ID.
-- Clerk and Supabase are NOT connected via Supabase Auth. Clerk is the single source of truth for identity.
-
-### Slack Integration
-- Slack Bot receives messages via Events API → FastAPI `/api/v1/slack/events`
-- Bot identifies user via Slack-to-Clerk mapping in DB
-- Uses Haiku for fast conversational responses
-- Can trigger full analysis (upgrades to Sonnet/Opus) on request
-- Responds in-thread with financial summaries, alerts, answers
-
-### Data Caching Strategy
-- QuickBooks data is cached in Supabase `qb_cache` table with `updated_at` timestamp
-- Cache TTL: 1 hour for financial statements, 15 min for real-time data
-- Cache check: query `qb_cache` first, hit QuickBooks API only if stale or missing
-- Long-running agent tasks use FastAPI BackgroundTasks, results written to Supabase, frontend polls for completion
-
-### Data Flow
-```
-QuickBooks API → Supabase Cache → Orchestrator → [Tools | Opus/Sonnet/Haiku] → Merged Output → API / Slack
+```bash
+cd frontend && npm install                 # Install deps
+cd frontend && npm run dev                 # Dev server (port 3000)
+cd frontend && npm run build               # Production build
+cd frontend && npm run lint                # Lint
 ```
 
-## MVP Features
-
-1. **Financial Reporting** — P&L, Balance Sheet, Cash Flow Statement analysis with KPIs
-2. **Cash Flow Management & Forecasting** — Runway calculation, burn rate, 3-6 month projections
-3. **Expense Management** — Budget vs actual, anomaly detection, category analysis
-4. **Slack Bot** — Conversational access to all three features above
-
-## Critical Rules
-
-- **NEVER hardcode API keys.** Use environment variables via pydantic-settings.
-- **NEVER use pip.** All Python packages managed through `uv`.
-- **All financial calculations go through deterministic tools**, not LLM. No exceptions.
-- **QuickBooks data must be cached in Supabase `qb_cache` table.** Never call QB API on every request.
-- **Type hints on every function.** Use Pydantic models for all data boundaries.
-- **Every tool must have a corresponding test** in `tests/test_tools/`.
-- **Use the right model for the task.** Don't send Slack chat to Opus or complex analysis to Haiku.
-- **Clerk is the auth source of truth.** Never store passwords or manage sessions manually.
-- **API versioning:** All routes under `/api/v1/`. Never serve unversioned endpoints.
+### CI/CD
+- GitHub Actions runs on every push to `main` and `develop`
+- CI: lint → type check → tool tests → API tests → coverage
+- Deploy: manual trigger via `workflow_dispatch` (end of each sprint week)
+- See `docs/testing.md` for full pipeline config
 
 ## Environment Variables
 
-```
+```env
 # Clerk
 CLERK_SECRET_KEY=
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 
-# Supabase (database only)
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
+# Database (Supabase Postgres direct connection)
+DATABASE_URL=postgresql+asyncpg://postgres:[password]@[host]:5432/postgres
 
 # Anthropic
 ANTHROPIC_API_KEY=
 
-# QuickBooks
-QB_CLIENT_ID=
-QB_CLIENT_SECRET=
-QB_REDIRECT_URI=
-QB_ENVIRONMENT=sandbox
+# Codat
+CODAT_API_KEY=
+CODAT_BASE_URL=
+
+# Plaid
+PLAID_CLIENT_ID=
+PLAID_SECRET=
+PLAID_ENV=sandbox
 
 # Stripe
 STRIPE_SECRET_KEY=
@@ -202,13 +199,44 @@ STRIPE_WEBHOOK_SECRET=
 # Slack
 SLACK_BOT_TOKEN=
 SLACK_SIGNING_SECRET=
-
-# LangSmith
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=
-LANGCHAIN_PROJECT=flowytics
+SLACK_APP_TOKEN=
 ```
+
+## Critical Rules (Universal)
+
+1. **NEVER use pip.** `uv add` only.
+2. **NEVER use float for money.** `Decimal` everywhere.
+3. **NEVER use DSPy.** Plain text prompts in `/prompts`.
+4. **NEVER skip type hints.** Every function, every return.
+5. **NEVER call LLM for arithmetic.** Deterministic tools only.
+6. **NEVER query DB without tenant scope.** Every query filters by `tenant_id`.
+7. **NEVER expose secrets.** pydantic-settings + .env only.
+8. **Tools are the source of truth for numbers.** If LLM contradicts a tool, the tool wins.
+9. **Codat is the accounting abstraction.** No direct QBO/Xero API unless Codat is blocked.
+10. **Slack is the product.** Web UI exists only for onboarding.
+11. **Graceful degradation always.** When a dependency fails, degrade — don't crash. See `docs/architecture.md` → Graceful Degradation Policy.
+
+## Documentation Map
+
+| File | Covers | Read when... |
+|------|--------|--------------|
+| `CLAUDE.md` | Vision, principles, rules, structure | Every session start |
+| `docs/architecture.md` | System overview, integrations, deployment, costs | Designing new features, integration work |
+| `docs/backend.md` | Python conventions, FastAPI patterns, data processing | Writing backend code |
+| `docs/agents.md` | LangGraph agent, all tool specs, model routing | Working on agent or tools |
+| `docs/db.md` | Full schema, RLS, indexes, data principles | Database work |
+| `docs/frontend.md` | Onboarding flow, Clerk/Stripe/Codat/Plaid embeds | Frontend work |
+| `docs/testing.md` | Test strategy, coverage goals, sprint reports | Writing tests, sprint reviews |
 
 ## When Compacting
 
-Always preserve: list of modified files, current feature being built, test results, and any tool definitions in progress.
+Always preserve:
+- List of modified files in this session
+- Current sprint week number
+- Current feature being built
+- Test results from this session
+- Any tool definitions in progress
+- Unresolved errors or blockers
+
+# Windows'ta bu kullan (fastapi-cli emoji bug'ı yüzünden)
+uv run uvicorn backend.app.main:app --reload

@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, Request
 import httpx
 
-from backend.app.config import get_settings
+from app.config import get_settings
 
 
 async def verify_clerk_token(request: Request) -> dict:
@@ -17,7 +17,7 @@ async def verify_clerk_token(request: Request) -> dict:
     async with httpx.AsyncClient() as client:
         response = await client.get(
             "https://api.clerk.com/v1/sessions/verify",
-            headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
+            headers={"Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"},
             params={"token": token},
         )
 

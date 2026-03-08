@@ -1,36 +1,35 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Clerk
-    clerk_secret_key: str
-
-    # Supabase
-    supabase_url: str
-    supabase_service_role_key: str
+    # Database (Supabase Postgres direct connection via asyncpg)
+    DATABASE_URL: str = ""
 
     # Anthropic
-    anthropic_api_key: str
+    ANTHROPIC_API_KEY: str = ""
 
-    # QuickBooks
-    qb_client_id: str
-    qb_client_secret: str
-    qb_redirect_uri: str = "http://localhost:8000/api/v1/quickbooks/callback"
-    qb_environment: str = "sandbox"
+    # Clerk
+    CLERK_SECRET_KEY: str = ""
+
+    # Codat
+    CODAT_API_KEY: str = ""
+    CODAT_BASE_URL: str = "https://api.codat.io"
+
+    # Plaid
+    PLAID_CLIENT_ID: str = ""
+    PLAID_SECRET: str = ""
+    PLAID_ENV: str = "sandbox"
 
     # Stripe
-    stripe_secret_key: str
-    stripe_webhook_secret: str
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
 
     # Slack
-    slack_bot_token: str
-    slack_signing_secret: str
-
-    # LangSmith
-    langchain_tracing_v2: bool = True
-    langchain_api_key: str = ""
-    langchain_project: str = "flowytics"
+    SLACK_BOT_TOKEN: str = ""
+    SLACK_SIGNING_SECRET: str = ""
+    SLACK_APP_TOKEN: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
@@ -38,3 +37,6 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+settings = get_settings()

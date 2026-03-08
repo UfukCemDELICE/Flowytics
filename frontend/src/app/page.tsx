@@ -19,7 +19,7 @@ export default async function Home() {
           </div>
           <div className="flex items-center gap-4">
             {userId ? (
-              <Link className="hidden sm:block text-sm font-medium text-text-main hover:text-primary transition-colors" href="/dashboard">Dashboard</Link>
+              <Link className="hidden sm:block text-sm font-medium text-text-main hover:text-primary transition-colors" href="/onboarding">Dashboard</Link>
             ) : (
               <Link className="hidden sm:block text-sm font-medium text-text-main hover:text-primary transition-colors" href="/sign-in">Login</Link>
             )}
@@ -40,7 +40,7 @@ export default async function Home() {
             </div>
             <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-text-main">
               Your accounting software has the data. <br/>
-              <span className="text-text-dim font-normal">You're missing the</span> <span className="text-primary">CFO.</span>
+              <span className="text-text-dim font-normal">You&apos;re missing the</span> <span className="text-primary">CFO.</span>
             </h1>
             <p className="text-lg text-text-dim max-w-lg leading-relaxed">
               Stop flying blind. Flowytics turns your accounting data into actionable financial intelligence, delivered straight to Slack before you burn out.
@@ -140,7 +140,7 @@ export default async function Home() {
                 <span className="material-symbols-outlined text-[28px]">history</span>
               </div>
               <h3 className="text-xl font-bold text-text-main mb-2">Reactive Accounting</h3>
-              <p className="text-text-dim leading-relaxed">Bookkeepers record history, they don't predict the future. By the time you get the P&amp;L, it's 20 days too late.</p>
+              <p className="text-text-dim leading-relaxed">Bookkeepers record history, they don&apos;t predict the future. By the time you get the P&amp;L, it&apos;s 20 days too late.</p>
             </div>
             <div className="bg-white border border-surface-border p-8 rounded-2xl hover:border-primary/50 hover:shadow-lg transition-all group">
               <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-white text-primary transition-colors">
@@ -170,7 +170,7 @@ export default async function Home() {
                 <span className="material-symbols-outlined text-4xl text-text-main">link</span>
               </div>
               <h3 className="text-xl font-bold text-text-main mb-2">1. Connect Data</h3>
-              <p className="text-sm text-text-dim">One-click integration with QuickBooks and Bank Accounts. Read-only access securely encrypted.</p>
+              <p className="text-sm text-text-dim">One-click integration with Accounting Software and Bank Accounts. Read-only access securely encrypted.</p>
             </div>
             <div className="relative z-10 flex flex-col items-center text-center max-w-[300px]">
               <div className="w-24 h-24 rounded-full bg-white border-2 border-primary flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(37,99,235,0.15)]">
@@ -285,7 +285,7 @@ export default async function Home() {
                     Flowytics
                   </th>
                   <th className="p-4 text-sm font-bold text-text-dim w-1/4 text-center">Fractional CFO</th>
-                  <th className="p-4 text-sm font-bold text-text-dim w-1/4 text-center">QuickBooks</th>
+                  <th className="p-4 text-sm font-bold text-text-dim w-1/4 text-center">Accounting Software</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
@@ -378,18 +378,18 @@ export default async function Home() {
               </span>
             </summary>
             <div className="text-text-dim px-6 pb-6 pt-0 leading-relaxed">
-              Absolutely. We use bank-level 256-bit encryption and partner with Plaid and QuickBooks for read-only access. We never have the ability to move money or change records.
+              Absolutely. We use bank-level 256-bit encryption and partner with Plaid and Codat for read-only access. We never have the ability to move money or change records.
             </div>
           </details>
           <details className="group bg-white border border-surface-border rounded-lg shadow-sm">
             <summary className="flex justify-between items-center cursor-pointer p-6 list-none">
-              <span className="font-medium text-lg text-text-main">How does Flowytics differ from QuickBooks?</span>
+              <span className="font-medium text-lg text-text-main">How does Flowytics differ from Accounting Software?</span>
               <span className="transition group-open:rotate-180 text-text-dim">
                 <span className="material-symbols-outlined">expand_more</span>
               </span>
             </summary>
             <div className="text-text-dim px-6 pb-6 pt-0 leading-relaxed">
-              QuickBooks is for recording what happened in the past (accounting). Flowytics is for understanding what it means for your future (finance/CFO). We sit on top of QuickBooks to give you insights.
+              Accounting Software is for recording what happened in the past. Flowytics is for understanding what it means for your future. We sit on top of Accounting Software to give you insights.
             </div>
           </details>
           <details className="group bg-white border border-surface-border rounded-lg shadow-sm">

@@ -1,16 +1,22 @@
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api.v1.reports import router as reports_router
-from backend.app.api.v1.cashflow import router as cashflow_router
-from backend.app.api.v1.expenses import router as expenses_router
-from backend.app.api.v1.quickbooks import router as quickbooks_router
-from backend.app.api.v1.slack import router as slack_router
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # Startup: scheduler and Slack bot will be initialised here
+    yield
+    # Shutdown: cleanup goes here
+
 
 app = FastAPI(
-    title="Flowytics",
-    description="Agentic CFO — NeuroSymbolic AI for startup finance",
+    title="Flowytics API",
+    description="Agentic CFO — AI-powered managerial accounting for startups",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -21,13 +27,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(reports_router, prefix="/api/v1")
-app.include_router(cashflow_router, prefix="/api/v1")
-app.include_router(expenses_router, prefix="/api/v1")
-app.include_router(quickbooks_router, prefix="/api/v1")
-app.include_router(slack_router, prefix="/api/v1")
 
-
-@app.get("/health")
+@app.get("/api/v1/health", tags=["health"])
 async def health() -> dict:
-    return {"status": "ok", "version": "0.1.0"}
+    """Health check — confirms the API is running."""
+    return {"status": "ok"}

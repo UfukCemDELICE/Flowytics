@@ -1,7 +1,7 @@
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from backend.app.config import get_settings
+from app.config import get_settings
 
 
 class SlackClient:
@@ -9,7 +9,7 @@ class SlackClient:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self.client = WebClient(token=settings.slack_bot_token)
+        self.client = WebClient(token=settings.SLACK_BOT_TOKEN)
 
     async def send_message(self, channel: str, text: str) -> bool:
         """Send a message to a Slack channel or DM."""

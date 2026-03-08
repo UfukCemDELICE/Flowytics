@@ -1,0 +1,30 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Railway
+        run: |
+          curl -X POST "${{ secrets.RAILWAY_DEPLOY_WEBHOOK_URL }}"
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    # Vercel auto-deploys on push to main — no action needed
+    steps:
+      - run: echo "Frontend auto-deploys via Vercel Git integration"

@@ -1,7 +1,7 @@
 import stripe
 from fastapi import HTTPException
 
-from backend.app.config import get_settings
+from app.config import get_settings
 
 _PRICE_IDS: dict[str, str] = {
     "pro_monthly": "price_pro_monthly",  # Set real price ID from Stripe dashboard
@@ -10,7 +10,7 @@ _PRICE_IDS: dict[str, str] = {
 
 def _client() -> stripe.Stripe:
     settings = get_settings()
-    return stripe.Stripe(api_key=settings.stripe_secret_key)
+    return stripe.Stripe(api_key=settings.STRIPE_SECRET_KEY)
 
 
 async def create_checkout_session(
@@ -40,7 +40,7 @@ def verify_webhook(payload: bytes, sig_header: str) -> dict:
     settings = get_settings()
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.stripe_webhook_secret
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature")

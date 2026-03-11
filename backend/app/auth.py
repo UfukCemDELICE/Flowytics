@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, Request
 import httpx
 
-from app.config import get_settings
+from backend.app.config import get_settings
 
 
 async def verify_clerk_token(request: Request) -> dict:
@@ -27,6 +27,13 @@ async def verify_clerk_token(request: Request) -> dict:
     return response.json()
 
 
-async def get_current_user_id(claims: dict = Depends(verify_clerk_token)) -> str:
-    """Extract Clerk user ID from verified token claims."""
-    return claims["sub"]
+async def get_current_user(claims: dict = Depends(verify_clerk_token)) -> dict:
+    """Extract Clerk user ID and org ID from verified token claims."""
+    org_id = claims.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=401, detail="User must belong to an organization")
+    
+    return {
+        "user_id": claims["sub"],
+        "org_id": org_id
+    }

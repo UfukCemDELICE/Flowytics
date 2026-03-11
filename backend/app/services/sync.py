@@ -1,0 +1,92 @@
+from datetime import datetime, timezone, timedelta
+import logging
+from dateutil.relativedelta import relativedelta
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
+
+from backend.app.models.integration import Integration
+from backend.app.models.financial_snapshot import FinancialSnapshot
+from backend.app.integrations.quickbooks import (
+    get_profit_and_loss,
+    get_balance_sheet,
+    get_cash_flow,
+    IntegrationError
+)
+
+logger = logging.getLogger(__name__)
+
+async def sync_tenant(tenant_id: str, session: AsyncSession) -> dict:
+    """Pull P&L, Balance Sheet, and Cash Flow from QBO for the last 12 months, save to DB."""
+    stmt = select(Integration).where(
+        Integration.tenant_id == tenant_id,
+        Integration.provider == "quickbooks",
+        Integration.sync_status == "active"
+    )
+    result = await session.execute(stmt)
+    integration = result.scalar_one_or_none()
+    
+    if not integration:
+        raise IntegrationError("No active QuickBooks integration found for tenant")
+        
+    realm_id = integration.provider_connection_id
+    
+    # Use last 12 months as the default period
+    today = datetime.now(timezone.utc).date()
+    start_date = today - relativedelta(months=12)
+    
+    start_date_str = start_date.isoformat()
+    end_date_str = today.isoformat()
+    
+    try:
+        # Pull reports from QBO
+        pl_data = await get_profit_and_loss(realm_id, start_date_str, end_date_str, session)
+        bs_data = await get_balance_sheet(realm_id, start_date_str, end_date_str, session)
+        cf_data = await get_cash_flow(realm_id, start_date_str, end_date_str, session)
+        
+        # Save snapshots
+        snapshots = [
+            FinancialSnapshot(
+                tenant_id=tenant_id,
+                snapshot_date=today,
+                source="quickbooks",
+                data_type="profit_loss",
+                raw_data=pl_data,
+                period_start=start_date,
+                period_end=today
+            ),
+            FinancialSnapshot(
+                tenant_id=tenant_id,
+                snapshot_date=today,
+                source="quickbooks",
+                data_type="balance_sheet",
+                raw_data=bs_data,
+                period_start=start_date,
+                period_end=today
+            ),
+            FinancialSnapshot(
+                tenant_id=tenant_id,
+                snapshot_date=today,
+                source="quickbooks",
+                data_type="cash_flow",
+                raw_data=cf_data,
+                period_start=start_date,
+                period_end=today
+            )
+        ]
+        
+        for snap in snapshots:
+            session.add(snap)
+            
+        # Update integration status
+        integration.last_synced_at = datetime.now(timezone.utc)
+        integration.sync_status = "active"
+        
+        await session.commit()
+        return {"status": "synced", "snapshots_created": len(snapshots)}
+        
+    except IntegrationError as e:
+        logger.error(f"Sync failed for tenant {tenant_id}: {str(e)}")
+        integration.sync_status = "error"
+        integration.error_message = str(e)
+        await session.commit()
+        raise

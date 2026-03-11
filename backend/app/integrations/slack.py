@@ -1,7 +1,7 @@
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from app.config import get_settings
+from backend.app.config import get_settings
 
 
 class SlackClient:

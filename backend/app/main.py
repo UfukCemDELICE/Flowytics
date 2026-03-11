@@ -4,6 +4,8 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.v1 import me, quickbooks
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -26,6 +28,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(me.router, prefix="/api/v1")
+app.include_router(quickbooks.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health", tags=["health"])

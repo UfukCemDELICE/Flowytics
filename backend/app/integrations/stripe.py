@@ -1,7 +1,7 @@
 import stripe
 from fastapi import HTTPException
 
-from app.config import get_settings
+from backend.app.config import get_settings
 
 _PRICE_IDS: dict[str, str] = {
     "pro_monthly": "price_pro_monthly",  # Set real price ID from Stripe dashboard

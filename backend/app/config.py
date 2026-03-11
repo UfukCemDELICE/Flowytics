@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     PLAID_SECRET: str = ""
     PLAID_ENV: str = "sandbox"
 
+    # QuickBooks Online
+    QB_CLIENT_ID: str = ""
+    QB_CLIENT_SECRET: str = ""
+    QB_REDIRECT_URI: str = ""
+    QB_ENVIRONMENT: str = "sandbox"
+
     # Stripe
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""

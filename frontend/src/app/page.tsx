@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
+import { LogoLink } from "@/components/LogoLink";
 
 export default async function Home() {
   const { userId } = await auth();
@@ -9,7 +10,7 @@ export default async function Home() {
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-surface-border glass-nav">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-4xl font-extrabold tracking-tight text-[#2962ff]">Flowytics</h2>
+            <LogoLink />
           </div>
           <div className="hidden md:flex items-center gap-8">
             <a className="text-sm font-medium text-text-dim hover:text-primary transition-colors" href="#how-it-works">How It Works</a>
@@ -19,13 +20,22 @@ export default async function Home() {
           </div>
           <div className="flex items-center gap-4">
             {userId ? (
-              <Link className="hidden sm:block text-sm font-medium text-text-main hover:text-primary transition-colors" href="/onboarding">Dashboard</Link>
+              <>
+                <Link className="hidden sm:block text-sm font-medium text-text-main hover:text-primary transition-colors" href="/dashboard">Dashboard</Link>
+                <Link className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-[0_2px_10px_rgba(37,99,235,0.2)] hover:shadow-[0_4px_15px_rgba(37,99,235,0.3)]" href="/dashboard">
+                  Go to Dashboard
+                </Link>
+              </>
             ) : (
-              <Link className="hidden sm:block text-sm font-medium text-text-main hover:text-primary transition-colors" href="/sign-in">Login</Link>
+              <>
+                <Link className="hidden sm:flex text-sm font-bold text-text-main border border-surface-border hover:border-primary/50 bg-white px-5 py-2 rounded-lg transition-all items-center shadow-sm" href="/sign-in">
+                  Sign In
+                </Link>
+                <Link className="bg-primary hover:bg-primary-hover text-white px-5 py-2 rounded-lg text-sm font-bold transition-all shadow-[0_2px_10px_rgba(37,99,235,0.2)] hover:shadow-[0_4px_15px_rgba(37,99,235,0.3)]" href="/sign-up">
+                  Sign Up
+                </Link>
+              </>
             )}
-            <button className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-[0_2px_10px_rgba(37,99,235,0.2)] hover:shadow-[0_4px_15px_rgba(37,99,235,0.3)]">
-              Get Early Access
-            </button>
           </div>
         </div>
       </nav>
@@ -46,10 +56,10 @@ export default async function Home() {
               Stop flying blind. Flowytics turns your accounting data into actionable financial intelligence, delivered straight to Slack before you burn out.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mt-4">
-              <button className="bg-primary hover:bg-primary-hover text-white px-8 py-3.5 rounded-lg text-base font-bold transition-all shadow-[0_4px_14px_rgba(37,99,235,0.3)] flex items-center justify-center gap-2">
-                Get Started
+              <Link className="bg-primary hover:bg-primary-hover text-white px-8 py-3.5 rounded-lg text-base font-bold transition-all shadow-[0_4px_14px_rgba(37,99,235,0.3)] flex items-center justify-center gap-2" href={userId ? "/dashboard" : "/sign-up"}>
+                {userId ? "Go to Dashboard" : "Sign Up Now"}
                 <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-              </button>
+              </Link>
               <button className="px-8 py-3.5 rounded-lg text-base font-medium text-text-main border border-surface-border hover:border-primary hover:text-primary bg-white transition-colors flex items-center justify-center gap-2 group shadow-sm">
                 <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">play_circle</span>
                 See How It Works
@@ -409,7 +419,7 @@ export default async function Home() {
       <footer className="border-t border-surface-border bg-background-dark py-12 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-2">
-            <h2 className="text-4xl font-extrabold tracking-tight text-[#2962ff]">Flowytics</h2>
+            <LogoLink />
           </div>
           <div className="flex flex-wrap justify-center gap-8 text-sm text-text-dim">
             <a className="hover:text-primary transition-colors" href="#">Privacy Policy</a>

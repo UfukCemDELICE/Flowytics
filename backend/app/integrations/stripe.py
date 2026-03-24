@@ -8,13 +8,13 @@ _PRICE_IDS: dict[str, str] = {
 }
 
 
-def _client() -> stripe.Stripe:
+def _setup_stripe():
     settings = get_settings()
-    return stripe.Stripe(api_key=settings.STRIPE_SECRET_KEY)
+    stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 async def create_checkout_session(
-    clerk_user_id: str,
+    clerk_org_id: str,
     tier: str,
     success_url: str,
     cancel_url: str,
@@ -24,13 +24,13 @@ async def create_checkout_session(
     if not price_id:
         raise HTTPException(status_code=400, detail=f"Unknown tier: {tier}")
 
-    client = _client()
-    session = client.checkout.sessions.create(
+    _setup_stripe()
+    session = stripe.checkout.Session.create(
         mode="subscription",
         line_items=[{"price": price_id, "quantity": 1}],
         success_url=success_url,
         cancel_url=cancel_url,
-        metadata={"clerk_user_id": clerk_user_id},
+        metadata={"clerk_org_id": clerk_org_id},
     )
     return session.url or ""
 

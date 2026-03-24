@@ -10,7 +10,7 @@
               │     CFO System)      │
               └──────┬───────┬───────┘
                      │       │
-              Codat API    Plaid API
+              QuickBooks API   Plaid (Planned)
                      │       │
               ┌──────┘       └──────┐
         Accounting Software    Bank Accounts
@@ -51,8 +51,8 @@ Single backend process. No microservices.
 
 External APIs:
   → Anthropic Claude API (LLM reasoning)
-  → Codat API (accounting data)
-  → Plaid API (banking data)
+  → QuickBooks API (accounting data)
+  → Plaid API (banking data, planned)
   → Slack API (messaging)
   → Stripe API (billing)
   → Clerk API (auth verification)
@@ -63,7 +63,7 @@ External APIs:
 ### Flow 1 — Onboarding
 ```
 Clerk Sign Up → Stripe Payment Setup (14-day trial) →
-Codat Link (connect QBO) → Plaid Link (connect bank, optional) →
+QuickBooks OAuth (connect QBO) → Plaid Link (connect bank, planned) →
 Slack OAuth (add bot) → Initial data sync triggered →
 First CFO report sent to Slack within 24h
 ```
@@ -72,7 +72,7 @@ Details: see frontend.md
 ### Flow 2 — Daily Sync (Scheduled)
 ```
 APScheduler triggers at 6am UTC for each active tenant
-  → Codat: GET /companies/{id}/data/{type} → P&L, Balance Sheet, Transactions
+  → QuickBooks: Query Reports via API → P&L, Balance Sheet, Transactions
   → Plaid: POST /transactions/sync → new transactions since last cursor
   → Raw JSONB saved to financial_snapshots table
   → At 7am: deterministic tools run (burn rate, runway, anomalies)
@@ -99,37 +99,28 @@ Slack message → FastAPI webhook endpoint → acknowledge 200 OK immediately
 
 ## Integration Layer
 
-### Codat — Accounting Data (Primary)
+### QuickBooks — Accounting Data (Primary)
 
-Normalized API for QBO + Xero + Sage + NetSuite. One integration, multiple platforms.
+Direct integration via standard OAuth and QBO API.
 
 **MVP endpoints:**
 | Endpoint | Returns | Used for |
 |----------|---------|----------|
-| `GET /data/profitAndLoss` | Revenue, expenses, net income | Burn rate, margins |
-| `GET /data/balanceSheet` | Assets, liabilities, equity | Cash position, ratios |
-| `GET /data/accounts` | Chart of accounts | Category mapping |
-| `GET /data/bankTransactions` | Transaction detail | Anomaly detection |
-| `GET /data/invoices` | Accounts receivable | Cash flow timing |
-| `GET /data/bills` | Accounts payable | Cash flow timing |
+| `ProfitAndLoss` | Revenue, expenses, net income | Burn rate, margins |
+| `BalanceSheet` | Assets, liabilities, equity | Cash position, ratios |
+| `Account` | Chart of accounts | Category mapping |
+| `TransactionList` | Transaction detail | Anomaly detection |
 
-**Sync:** Codat webhooks (DataSyncCompleted) for near real-time. Daily scheduled pull as fallback.
-
-**Onboarding:** Codat Link UI embedded in frontend wizard. Handles OAuth.
-
-**Fallback:** If Codat approval blocked >3 days, use `python-quickbooks` directly against QBO sandbox. Wrap behind same interface so switch is transparent.
-
-**No Codat SDK in dependencies.** Codat's Python SDK is community-maintained and sometimes outdated. Instead, use `httpx` (already in deps) with a thin wrapper in `backend/app/integrations/codat.py`. Codat API is simple REST: auth header + GET. One file to maintain, no third-party SDK version to track.
+**Sync:** Webhooks or daily scheduled pulls.
+**Onboarding:** Direct QBO OAuth flow in the frontend wizard/dashboard.
 
 ### Plaid — Banking Data (Optional in MVP)
-
-Codat already provides bank transaction data via QBO bank feeds. Plaid adds real-time balance checks (QBO can be hours stale).
 
 **MVP endpoints:**
 | Endpoint | Returns | Used for |
 |----------|---------|----------|
 | `GET /accounts/balance/get` | Real-time balances | Accurate cash position |
-| `POST /transactions/sync` | Incremental feed | Cross-validation with Codat |
+| `POST /transactions/sync` | Incremental feed | Cross-validation with Quickbooks |
 
 **Onboarding:** Plaid Link UI. Skippable — "Connect bank for real-time cash tracking."
 
@@ -169,8 +160,8 @@ The system must never fully stop. When dependencies fail, degrade gracefully:
 
 | Failure | Impact | System Response |
 |---------|--------|----------------|
-| Codat connection lost | No fresh accounting data | Continue with last `financial_snapshots`. All Slack messages show "⚠️ Using data from {date}. Reconnect at app.flowytics.io" |
-| Plaid connection lost | No real-time bank balance | Fall back to Codat's bank data (delayed but available). No user-facing warning unless Codat also down. |
+| QuickBooks connection lost | No fresh accounting data | Continue with last `financial_snapshots`. All Slack messages show "⚠️ Using data from {date}. Reconnect via dashboard." |
+| Plaid connection lost | No real-time bank balance | Fall back to QBO's bank data. |
 | Stripe payment failed | Revenue at risk | `past_due` status. Service continues 14 days (Stripe smart retry). Slack warning sent. After 14 days → `cancelled`, final notice, agent stops. |
 | Slack bot removed | Can't deliver insights | Agent completes analysis, saves to DB. Delivery marked failed. Pending reports queued. Delivered when Slack reconnected. |
 | Claude API down | No LLM reasoning | Retry once. If fails: deliver tool results only (numbers without narrative). "AI analysis temporarily unavailable." |
@@ -203,7 +194,7 @@ Managed PostgreSQL. Direct connection via asyncpg (not REST API). Connection poo
 | Vercel (Pro) | $20 |
 | Supabase (Pro) | $25 |
 | Claude API (~10 tenants) | $50-150 |
-| Codat (Startup tier) | $0-99 |
+| QuickBooks API | $0 (Free) |
 | Plaid (Development) | $0 |
 | Clerk (Free tier) | $0 |
 | Stripe (per txn) | 2.9% + 30¢ |
@@ -219,10 +210,8 @@ Revenue at 10 paying tenants: $1,500/mo. Positive unit economics from day one.
 | Multi-agent system | Single agent handles all tools. Multi-agent adds orchestration overhead with zero value at this scale. |
 | Neuro-symbolic AI (PyReason) | Python 3.12 incompatible, months of R&D, solo founder can't afford. |
 | DSPy for prompts | Zero experience, no training data. Plain text prompts for MVP. |
-| Direct QBO API | Codat provides multi-platform abstraction. Direct only as fallback. |
-| Codat Python SDK | Community-maintained, sometimes outdated. httpx wrapper is simpler and maintainable. |
-| Supabase REST API (supabase-py) | Direct Postgres via SQLModel + asyncpg gives proper ORM, migrations, type safety. |
-| Web dashboard | Slack-first. Dashboard adds frontend complexity without MVP value. |
+| Direct QBO API | Decided to adopt direct integration and drop Codat after unresponsive experience. |
+| Web dashboard | Allowed strictly for onboarding and integration/billing management. No analytics reports (Slack-first). |
 | Türkiye market | Different accounting system, no Plaid/Codat, low payment capacity. |
 | Fractional CFO B2B2C | $46-97M funded competitors, Botkeeper's $90M failure. |
 | LangSmith observability | Paid service. Console logging + agent_runs table sufficient for MVP. |

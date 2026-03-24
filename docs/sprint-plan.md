@@ -54,7 +54,7 @@ SELECT count(*) FROM financial_snapshots; → 3 (profit_loss, balance_sheet, cas
 ```
 
 ### Risk
-- Codat cevap vermedi → **Çözüldü:** Direkt QBO API (`python-quickbooks`)
+- QuickBooks API entegrasyonuna geçildi → **Çözüldü:** Direkt QBO API (`python-quickbooks`)
 - QBO sandbox adres sorunu → **Çözüldü:** Intuit Developer hesabı açıldı
 
 ---
@@ -204,7 +204,7 @@ Scheduler tetiklenir (veya manuel trigger)
 - [ ] Stripe webhook handler: `checkout.session.completed`, `customer.subscription.updated`, `invoice.payment_failed`
 - [ ] Tenant lifecycle: trial → active → past_due → cancelled → churned
 - [ ] Grace period: 14 gün past_due sonra cancelled
-- [ ] QBO connect: Codat Link embed (veya direkt QBO OAuth redirect)
+- [ ] QBO connect: direkt QBO OAuth redirect
 - [ ] Plaid connect: Plaid Link embed (optional, skip allowed)
 - [ ] Slack connect: "Add to Slack" OAuth button
 - [ ] İlk bağlantı sonrası otomatik veri çekme ve ilk rapor oluşturma
@@ -212,7 +212,7 @@ Scheduler tetiklenir (veya manuel trigger)
 - [ ] End-to-end test: Signup → Connect → Sync → Slack report
 - [ ] Hata yönetimi: QBO bağlantı kopması, eksik veri, API hataları
 - [ ] Loglama: temel structured logging kurulumu
-- [ ] Graceful degradation: Codat/Plaid kopması → stale data warning
+- [ ] Graceful degradation: QBO/Plaid (planned) kopması → stale data warning
 - [ ] Graceful degradation: Stripe payment fail → past_due + Slack warning
 - [ ] Next.js middleware → proxy migration (deprecation fix)
 
@@ -348,7 +348,7 @@ Bu öğeler MVP'de YOK. Müşteri feedback'ine göre önceliklendirilecek:
 
 | Öğe | Ne Zaman |
 |-----|----------|
-| Xero desteği (Codat/Rutter ile) | İlk Xero kullanan müşteri istediğinde |
+| Xero desteği | İlk Xero kullanan müşteri istediğinde |
 | Web dashboard | Müşteri feedback tekrar tekrar isterse |
 | DSPy prompt optimization | 1000+ agent_run biriktikten sonra |
 | Alembic migrations | Schema değişiklikleri sıklaştığında |

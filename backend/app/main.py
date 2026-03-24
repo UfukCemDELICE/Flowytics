@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api.v1 import me, quickbooks
+from backend.app.api.v1 import me, quickbooks, stripe, slack
 
 
 @asynccontextmanager
@@ -23,7 +23,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,6 +31,8 @@ app.add_middleware(
 
 app.include_router(me.router, prefix="/api/v1")
 app.include_router(quickbooks.router, prefix="/api/v1")
+app.include_router(stripe.router, prefix="/api/v1")
+app.include_router(slack.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health", tags=["health"])

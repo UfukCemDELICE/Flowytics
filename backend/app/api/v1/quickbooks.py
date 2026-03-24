@@ -9,23 +9,36 @@ from backend.app.services.sync import sync_tenant
 
 router = APIRouter(prefix="/quickbooks", tags=["quickbooks"])
 
+import jwt
+from backend.app.config import get_settings
+
 @router.get("/auth")
 async def get_auth_url(user: dict = Depends(get_current_user)):
     """Return QuickBooks OAuth URL."""
-    url = quickbooks.generate_auth_url()
+    settings = get_settings()
+    # Safely encode the org_id in the state param to survive the OAuth roundtrip
+    state = jwt.encode({"org_id": user["org_id"]}, settings.CLERK_SECRET_KEY[:32], algorithm="HS256")
+    url = quickbooks.generate_auth_url(state)
     return {"auth_url": url}
 
 @router.get("/callback")
 async def oauth_callback(
     code: str = Query(...), 
     realmId: str = Query(...),
-    user: dict = Depends(get_current_user),
+    state: str = Query(...),
     session: AsyncSession = Depends(get_session)
 ):
     """Exchange code for tokens and save them."""
+    settings = get_settings()
     try:
-        await quickbooks.handle_callback(code, realmId, user["org_id"], session)
-        return {"status": "success", "message": "QuickBooks connected successfully."}
+        payload = jwt.decode(state, settings.CLERK_SECRET_KEY[:32], algorithms=["HS256"])
+        org_id = payload["org_id"]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid state token in OAuth callback")
+
+    try:
+        await quickbooks.handle_callback(code, realmId, org_id, session)
+        return RedirectResponse(url="http://localhost:3000/dashboard")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"OAuth failed: {str(e)}")
 

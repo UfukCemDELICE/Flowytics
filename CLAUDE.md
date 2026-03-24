@@ -27,13 +27,13 @@ AI-powered managerial accounting intelligence layer for pre-seed and seed-stage 
 - **Scheduler:** APScheduler (in-process, cron-style jobs)
 - **Auth:** Clerk (JWT verification)
 - **Payments:** Stripe
-- **Integrations:** Codat (accounting, via httpx wrapper — no SDK), Plaid (banking, optional), Slack Bot API
+- **Integrations:** QuickBooks Online API (accounting, direct integration), Plaid (banking, planned for later), Slack Bot API
 
 ### Frontend
 - **Framework:** Next.js (App Router, TypeScript strict)
 - **Styling:** Tailwind CSS + shadcn/ui
 - **Auth:** Clerk React components
-- **Scope:** Onboarding wizard ONLY. No web dashboard. Post-onboarding = Slack.
+- **Scope:** Onboarding wizard and a minimal web dashboard strictly for managing integrations (/dashboard). Post-onboarding AI interaction = Slack.
 
 ### Infrastructure
 - **Backend:** Railway (single service — API + Slack + Scheduler in one process)
@@ -56,7 +56,7 @@ flowytics/
 │   │   ├── api/v1/               # API routes (see backend.md)
 │   │   ├── agent/                # LangGraph CFO agent (see agents.md)
 │   │   ├── tools/                # Deterministic financial tools (see agents.md)
-│   │   ├── integrations/         # Codat, Plaid, Slack, Stripe clients
+│   │   ├── integrations/         # QuickBooks, Plaid (planned), Slack, Stripe clients
 │   │   ├── models/               # SQLModel DB models + Pydantic schemas
 │   │   ├── services/             # Business logic, sync, scheduler
 │   │   └── prompts/              # Plain text LLM prompt files
@@ -96,8 +96,8 @@ flowytics/
 - **D — Dependency Inversion:** Agent depends on tool interfaces, not concrete implementations. Integrations accessed via abstract clients.
 
 ### YAGNI — You Aren't Gonna Need It
-- No web dashboard until customer feedback demands it.
-- No Xero support until QBO is proven (Codat abstracts this anyway).
+- No web dashboard except for basic integration management until customer feedback demands more.
+- No Xero support yet. Focusing strictly on direct QuickBooks integration.
 - No multi-currency until a customer needs it.
 - No Alembic migrations until schema changes become frequent.
 
@@ -131,7 +131,7 @@ GIT:
 - NEVER rebase shared branches
 
 INTEGRATIONS:
-- NEVER delete Codat/Plaid connections without user consent
+- NEVER delete QuickBooks/Plaid connections without user consent
 - NEVER delete Stripe subscriptions programmatically without confirmation
 - NEVER remove Slack bot from workspace without warning
 
@@ -183,11 +183,12 @@ DATABASE_URL=postgresql+asyncpg://postgres:[password]@[host]:5432/postgres
 # Anthropic
 ANTHROPIC_API_KEY=
 
-# Codat
-CODAT_API_KEY=
-CODAT_BASE_URL=
+# QuickBooks
+QBO_CLIENT_ID=
+QBO_CLIENT_SECRET=
+QBO_ENVIRONMENT=sandbox
 
-# Plaid
+# Plaid (Planned)
 PLAID_CLIENT_ID=
 PLAID_SECRET=
 PLAID_ENV=sandbox
@@ -212,8 +213,8 @@ SLACK_APP_TOKEN=
 6. **NEVER query DB without tenant scope.** Every query filters by `tenant_id`.
 7. **NEVER expose secrets.** pydantic-settings + .env only.
 8. **Tools are the source of truth for numbers.** If LLM contradicts a tool, the tool wins.
-9. **Codat is the accounting abstraction.** No direct QBO/Xero API unless Codat is blocked.
-10. **Slack is the product.** Web UI exists only for onboarding.
+9. **QuickBooks API is the accounting abstraction.** Codat was dropped. Plaid is planned for later.
+10. **Slack is the product.** Web UI exists only for onboarding and integration management (/dashboard).
 11. **Graceful degradation always.** When a dependency fails, degrade — don't crash. See `docs/architecture.md` → Graceful Degradation Policy.
 
 ## Documentation Map

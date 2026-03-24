@@ -165,7 +165,7 @@ from fastapi import HTTPException
 
 # Integration errors — graceful degradation
 class IntegrationError(Exception):
-    """Codat/Plaid API failure."""
+    """QuickBooks/Plaid API failure."""
     pass
 
 @app.exception_handler(IntegrationError)
@@ -179,9 +179,9 @@ async def integration_error_handler(request, exc):
 **Error categories:**
 | Source | Strategy |
 |--------|----------|
-| Codat/Plaid 401 | Auto-refresh token → retry once |
-| Codat/Plaid 429 | Exponential backoff, use cached data |
-| Codat/Plaid 500 | Use last snapshot with "stale" warning |
+| QuickBooks/Plaid 401 | Auto-refresh token → retry once |
+| QuickBooks/Plaid 429 | Exponential backoff, use cached data |
+| QuickBooks/Plaid 500 | Use last snapshot with "stale" warning |
 | Claude timeout | Retry once, then return tool-only results |
 | Claude rate limit | Queue, notify user of delay |
 | LLM number mismatch | Use tool numbers, log discrepancy |
@@ -256,8 +256,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     ANTHROPIC_API_KEY: str
     CLERK_SECRET_KEY: str
-    CODAT_API_KEY: str
-    CODAT_BASE_URL: str = "https://api.codat.io"
+    QBO_CLIENT_ID: str
+    QBO_CLIENT_SECRET: str
+    QBO_ENVIRONMENT: str = "sandbox"
     PLAID_CLIENT_ID: str = ""
     PLAID_SECRET: str = ""
     PLAID_ENV: str = "sandbox"

@@ -97,7 +97,7 @@ tests/test_api/
 - Webhook signature verification
 - Tenant isolation (user A can't access user B's data)
 
-**Mock strategy:** Mock Clerk JWT verification in tests. Mock Codat/Plaid/Stripe API calls. Never hit real external APIs in tests.
+**Mock strategy:** Mock Clerk JWT verification in tests. Mock QuickBooks/Stripe/Plaid API calls. Never hit real external APIs in tests.
 
 ### Layer 3 — Agent Integration Tests (NICE TO HAVE)
 
@@ -210,8 +210,8 @@ No E2E tests (Cypress/Playwright) for MVP — third-party OAuth flows are imprac
 
 These test what happens when things break. Critical for business continuity.
 
-### Codat/Plaid Connection Lost
-**Test:** Mock Codat API returning 403 (disconnected).
+### QuickBooks/Plaid Connection Lost
+**Test:** Mock QuickBooks API returning 403 (disconnected).
 **Expected behavior:**
 - System continues using last known `financial_snapshots`
 - All tools run with stale data

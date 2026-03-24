@@ -31,10 +31,10 @@ def get_auth_client() -> AuthClient:
         settings.QB_ENVIRONMENT,
     )
 
-def generate_auth_url() -> str:
+def generate_auth_url(state: str) -> str:
     auth_client = get_auth_client()
     # Scopes: com.intuit.quickbooks.accounting
-    return auth_client.get_authorization_url(["com.intuit.quickbooks.accounting"])
+    return auth_client.get_authorization_url(["com.intuit.quickbooks.accounting"], state_token=state)
 
 async def handle_callback(code: str, realm_id: str, tenant_id: str, session: AsyncSession) -> Integration:
     auth_client = get_auth_client()

@@ -50,13 +50,13 @@ CREATE INDEX idx_tenants_status ON tenants(subscription_status);
 
 ### integrations
 
-Codat and Plaid connections per tenant.
+QuickBooks and Plaid connections per tenant.
 
 ```sql
 CREATE TABLE integrations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
-    provider TEXT NOT NULL CHECK (provider IN ('codat', 'plaid')),
+    provider TEXT NOT NULL CHECK (provider IN ('quickbooks', 'plaid')),
     provider_connection_id TEXT NOT NULL,
     credentials_encrypted TEXT,
     platform_name TEXT,
@@ -73,9 +73,9 @@ CREATE INDEX idx_integrations_provider ON integrations(tenant_id, provider);
 ```
 
 **Column decisions:**
-- `provider_connection_id`: Codat's `company_id` or Plaid's `item_id`. Generic name for both.
+- `provider_connection_id`: QuickBooks `realm_id` or Plaid's `item_id`. Generic name for both.
 - `credentials_encrypted`: Access/refresh tokens encrypted at rest. Decrypted only when calling the API.
-- `sync_cursor`: Plaid uses cursors for incremental sync. Codat uses push keys. Same column, different semantics.
+- `sync_cursor`: Plaid uses cursors for incremental sync. QuickBooks may use similar sync tokens. Same column, different semantics.
 - `error_message`: When `sync_status = 'error'`, this explains why. Shown to user if they ask.
 
 ### financial_snapshots
@@ -87,7 +87,7 @@ CREATE TABLE financial_snapshots (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
     snapshot_date DATE NOT NULL,
-    source TEXT NOT NULL CHECK (source IN ('codat', 'plaid')),
+    source TEXT NOT NULL CHECK (source IN ('quickbooks', 'plaid')),
     data_type TEXT NOT NULL CHECK (data_type IN (
         'profit_loss', 'balance_sheet', 'cash_flow',
         'transactions', 'accounts', 'invoices', 'bills'
@@ -104,7 +104,7 @@ CREATE INDEX idx_snapshots_source ON financial_snapshots(source);
 ```
 
 **Data principle: Store raw, transform on read.**
-- `raw_data` contains the full API response as-is from Codat/Plaid.
+- `raw_data` contains the full API response as-is from QuickBooks/Plaid.
 - Never transform during ingest. Transformation happens in tools when reading.
 - Why: when you discover a field you initially ignored (e.g., vendor names for AP aging), the data is already there. No re-sync needed.
 - Trade-off: JSONB queries are slower than normalized columns. At startup scale (thousands of rows, not millions), this is irrelevant. Normalize post-product-market-fit if query performance matters.
@@ -252,7 +252,7 @@ alembic upgrade head
 
 ```
 tenants
-  ├── integrations (1:N — one Codat + optionally one Plaid per tenant)
+  ├── integrations (1:N — one QuickBooks + optionally one Plaid per tenant)
   ├── financial_snapshots (1:N — daily snapshots accumulate)
   ├── computed_metrics (1:N — metrics per period)
   ├── agent_runs (1:N — every agent execution)

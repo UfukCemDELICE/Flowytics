@@ -15,9 +15,8 @@ uv remove supabase
 Supabase Python SDK replaced by direct Postgres connection via SQLModel + asyncpg.
 Supabase is still used as the managed database — just not the SDK.
 
-### Note on Codat
-No Codat SDK added. Codat's Python SDK is community-maintained and sometimes outdated.
-Instead: thin httpx wrapper in `backend/app/integrations/codat.py`. Codat API is simple REST — auth header + GET.
+### Note on QuickBooks
+Direct integration via python-quickbooks.
 httpx is already in dependencies. One file to maintain, zero SDK version risk.
 
 ### Final dependency list
@@ -70,4 +69,4 @@ Needed for Plaid Link UI in onboarding step 3.
 }
 ```
 
-Note: Codat Link is loaded via script tag or their hosted URL, not an npm package.
+Note: QuickBooks OAuth is handled via redirect from the backend.

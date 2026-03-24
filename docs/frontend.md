@@ -23,8 +23,8 @@ The existing frontend design (built with Google Stitch, refined in Antigravity) 
 - Tailwind CSS + shadcn/ui (Zinc theme, dark mode)
 - Clerk (`@clerk/nextjs`) for auth
 - Stripe (`@stripe/stripe-js`) for payment
-- Codat Link SDK for accounting connection
-- Plaid Link (`react-plaid-link`) for banking connection
+- QuickBooks OAuth for accounting connection
+- Plaid Link (`react-plaid-link`) for banking connection (planned for later)
 - Thin `fetch` wrapper for backend API calls (no axios, no supabase-js)
 
 ## Page Structure
@@ -40,8 +40,8 @@ frontend/src/app/
 │   ├── layout.tsx              # Stepper layout (progress bar across top)
 │   ├── page.tsx                # Step router (redirects to current step)
 │   ├── payment/page.tsx        # Step 1: Stripe payment setup
-│   ├── accounting/page.tsx     # Step 2: Connect QBO/Xero via Codat
-│   ├── banking/page.tsx        # Step 3: Connect bank via Plaid (skippable)
+│   ├── accounting/page.tsx     # Step 2: Connect QBO via OAuth
+│   ├── banking/page.tsx        # Step 3: Connect bank via Plaid (planned)
 │   ├── slack/page.tsx          # Step 4: Connect Slack workspace
 │   └── done/page.tsx           # Step 5: Success — "Go to Slack"
 ├── settings/
@@ -63,23 +63,23 @@ User enters payment info. 14-day free trial, $150/mo after.
 
 **Trial start:** `trial_started_at` is set NOT on payment setup, but when the first analysis runs successfully. The 14-day clock starts from first value delivered.
 
-**Why payment before connections:** Filters for serious intent. Only founders willing to commit (even with free trial) go through the integration steps. Reduces tire-kicker load on Codat/Plaid API quotas.
+**Why payment before connections:** Filters for serious intent. Only founders willing to commit (even with free trial) go through the integration steps. Reduces tire-kicker load on API quotas.
 
-### Step 2 — Connect Accounting Software (Codat)
+### Step 2 — Connect Accounting Software (QuickBooks)
 
-User connects QBO, Xero, or other supported accounting software.
+User connects their QuickBooks Online account.
 
 **Implementation:**
-- Backend calls Codat API to create a company → receives `companyId`
-- Backend generates Codat Link URL for that company
-- Frontend opens Codat Link in embedded iframe or redirect
-- User authorizes in QBO/Xero OAuth flow
-- Codat webhook `dataConnectionStatusChanged` → backend saves integration record
+- Backend exposes a QuickBooks OAuth authorization URL generator
+- Frontend redirects user to QuickBooks OAuth page
+- User authorizes Flowytics in QuickBooks
+- QuickBooks redirects back to backend callback URL
+- Backend exchanges code for tokens, saves integration record, and completes connection
 - Frontend polls backend until connection confirmed → advance to next step
 
 **UI:**
-- Show list of supported platforms (QBO, Xero) with logos
-- "Connect" button launches Codat Link
+- Show list of supported platforms (Currently: QBO) with logos
+- "Connect" button launches QuickBooks OAuth
 - Loading state while waiting for authorization
 - Green checkmark when connected
 - Error state with "Try Again" button
@@ -101,7 +101,7 @@ User connects bank account for real-time cash data.
 - Prominent "Skip" button alongside "Connect Bank"
 - Same pattern: loading → connected → next
 
-**Why optional:** Codat already provides bank data from QBO's connected bank feeds. Plaid adds real-time balance (hours vs minutes stale). Not critical path for MVP value.
+**Why optional:** QuickBooks already provides bank data from connected bank feeds. Plaid adds real-time balance checks (hours vs minutes stale). Planned for post-MVP.
 
 ### Step 4 — Connect Slack
 

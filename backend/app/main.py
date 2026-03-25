@@ -35,6 +35,12 @@ app.include_router(stripe.router, prefix="/api/v1")
 app.include_router(slack.router, prefix="/api/v1")
 
 
+from fastapi.responses import RedirectResponse
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/docs")
+
 @app.get("/api/v1/health", tags=["health"])
 async def health() -> dict:
     """Health check — confirms the API is running."""

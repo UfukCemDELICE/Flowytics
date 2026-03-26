@@ -2,13 +2,14 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class MonthlyFinancial(BaseModel):
     month_start: date
     total_revenue: Decimal
     total_expenses: Decimal
     net_income: Decimal
+    category_expenses: dict[str, Decimal] = Field(default_factory=dict)
 
 class BurnRateResult(BaseModel):
     net_burn_monthly: Decimal
@@ -38,3 +39,42 @@ class CashForecastResult(BaseModel):
 class FinancialSummary(BaseModel):
     current_cash_balance: Decimal
     monthly_financials: list[MonthlyFinancial]
+
+class Anomaly(BaseModel):
+    category: str
+    current_amount: Decimal
+    historical_mean: Decimal
+    z_score: Decimal
+    severity: Literal["warning", "critical"]
+    description: str
+
+class AnomalyResult(BaseModel):
+    anomalies: list[Anomaly]
+    scan_period_months: int
+
+class ScenarioChange(BaseModel):
+    type: Literal["hire", "fire", "revenue_change", "new_expense", "cut_expense"]
+    description: str
+    monthly_impact: Decimal
+
+class ScenarioResult(BaseModel):
+    current_runway: Decimal
+    new_runway: Decimal
+    delta_runway: Decimal
+    current_burn: Decimal
+    new_burn: Decimal
+    delta_burn: Decimal
+    changes_applied: list[ScenarioChange]
+
+class FundraisingMetrics(BaseModel):
+    mrr: Decimal | None
+    mrr_growth_rate: Decimal | None
+    arr: Decimal | None
+    burn_multiple: Decimal | None
+    runway_months: Decimal
+    gross_margin: Decimal | None
+
+class FundraisingResult(BaseModel):
+    readiness_score: int
+    metrics: FundraisingMetrics
+    gaps: list[str]

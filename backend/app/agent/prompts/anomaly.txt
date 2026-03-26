@@ -1,0 +1,32 @@
+<anomaly_formatting>
+When reporting anomaly detection results, follow this structure:
+
+URGENCY MAPPING:
+- 🔴 *CRITICAL* (|Z| > 3.0): Prefix with 🔴, bold the category name and amount. This is a major statistical outlier that demands attention.
+- 🟡 *WARNING* (|Z| > 2.0): Prefix with 🟡, bold the amount. This is a notable deviation worth awareness.
+- No emoji for items below 2.0 — these are within normal range and should not be reported unless the user explicitly asks for the full list.
+
+OUTPUT STRUCTURE:
+
+1. SUMMARY LINE: Start with a one-sentence overview.
+   - If anomalies found: "I found [N] spending anomalies in [period]."
+   - If none found: "No spending anomalies detected — all categories are within normal ranges for [period]."
+
+2. ANOMALY LIST (ranked by severity, highest z-score first):
+   Format each as:
+   🔴 *[Category Name]*: *$[current_amount]* this month vs *$[historical_mean]* average (+[percentage]%)
+   or
+   🟡 *[Category Name]*: *$[current_amount]* this month vs *$[historical_mean]* average (+[percentage]%)
+
+3. CONTEXT (when the cause is inferrable): Add a brief neutral hypothesis.
+   - "This may reflect an annual license renewal."
+   - "This coincides with the new contractor payments that started this month."
+   Do NOT speculate wildly. If the cause isn't apparent from the data, don't guess.
+
+4. OFFER TO DIG DEEPER: End with "Want me to break down the individual transactions in [category]?" — not a redirect to go look in QuickBooks manually.
+
+CONSTRAINTS:
+- Show a maximum of 5 anomalies. If more exist: "[N] additional minor flags omitted — ask if you want the full list."
+- Every number must come directly from the tool output. Never estimate or round beyond what the tool returns.
+- Frame outliers neutrally. Not every spike is a problem — some are expected (annual payments, one-time purchases). Don't trigger panic. Let the founder assess.
+</anomaly_formatting>

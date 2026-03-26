@@ -62,3 +62,16 @@ def profile_new():
             MonthlyFinancial(month_start=date(2025, 6, 1), total_revenue=Decimal("0"), total_expenses=Decimal("15000"), net_income=Decimal("-15000")),
         ]
     )
+
+@pytest.fixture
+def profile_with_anomaly():
+    return FinancialSummary(
+        current_cash_balance=Decimal("100000"),
+        monthly_financials=[
+            MonthlyFinancial(month_start=date(2025, 1, 1), total_revenue=Decimal("10000"), total_expenses=Decimal("5000"), net_income=Decimal("5000"), category_expenses={"AWS": Decimal("500"), "Marketing": Decimal("1000")}),
+            MonthlyFinancial(month_start=date(2025, 2, 1), total_revenue=Decimal("10000"), total_expenses=Decimal("5000"), net_income=Decimal("5000"), category_expenses={"AWS": Decimal("500"), "Marketing": Decimal("1000")}),
+            MonthlyFinancial(month_start=date(2025, 3, 1), total_revenue=Decimal("10000"), total_expenses=Decimal("5000"), net_income=Decimal("5000"), category_expenses={"AWS": Decimal("500"), "Marketing": Decimal("1000")}),
+            MonthlyFinancial(month_start=date(2025, 4, 1), total_revenue=Decimal("10000"), total_expenses=Decimal("5000"), net_income=Decimal("5000"), category_expenses={"AWS": Decimal("500"), "Marketing": Decimal("1000")}),
+            MonthlyFinancial(month_start=date(2025, 5, 1), total_revenue=Decimal("10000"), total_expenses=Decimal("25000"), net_income=Decimal("-15000"), category_expenses={"AWS": Decimal("20500"), "Marketing": Decimal("1000")}),
+        ]
+    )

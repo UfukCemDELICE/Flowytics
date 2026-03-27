@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +13,20 @@ from backend.app.services.sync import sync_tenant
 from backend.app.config import get_settings
 
 router = APIRouter(prefix="/quickbooks", tags=["quickbooks"])
+logger = logging.getLogger(__name__)
+
+
+async def _background_first_sync(org_id: str):
+    """Background task: pull QBO data immediately after OAuth connect."""
+    from backend.app.database import _get_engine
+    _, session_factory = _get_engine()
+    async with session_factory() as bg_session:
+        try:
+            result = await sync_tenant(org_id, bg_session)
+            logger.info(f"Auto first-sync completed for org {org_id}: {result}")
+        except Exception as e:
+            logger.error(f"Auto first-sync failed for org {org_id}: {e}")
+
 
 @router.get("/auth")
 async def get_auth_url(user: dict = Depends(get_current_user)):
@@ -27,7 +44,7 @@ async def oauth_callback(
     state: str = Query(...),
     session: AsyncSession = Depends(get_session)
 ) -> dict | RedirectResponse:
-    """Exchange code for tokens and save them."""
+    """Exchange code for tokens, save them, and trigger background data sync."""
     settings = get_settings()
     try:
         payload = jwt.decode(state, settings.CLERK_SECRET_KEY[:32], algorithms=["HS256"])
@@ -42,6 +59,8 @@ async def oauth_callback(
 
     try:
         await quickbooks.handle_callback(code, realmId, org_id, session)
+        # Fire background sync — user sees dashboard instantly, data populates async
+        asyncio.create_task(_background_first_sync(org_id))
         return RedirectResponse(url="http://localhost:3000/dashboard")
     except quickbooks.IntegrationError as e:
         raise HTTPException(status_code=502, detail={"error": "upstream_error", "message": str(e)})

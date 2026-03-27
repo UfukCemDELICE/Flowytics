@@ -207,12 +207,12 @@ Scheduler tetiklenir (veya manuel trigger)
 - [x] QBO connect: direkt QBO OAuth redirect
 - [ ] Plaid connect: Plaid Link embed (optional, skip allowed)
 - [x] Slack connect: "Add to Slack" OAuth button
-- [ ] İlk bağlantı sonrası otomatik veri çekme ve ilk rapor oluşturma
+- [x] İlk bağlantı sonrası otomatik veri çekme ve ilk rapor oluşturma
 - [ ] Hoşgeldin mesajı: "✅ Connected. First report in 24h."
 - [ ] End-to-end test: Signup → Connect → Sync → Slack report
-- [ ] Hata yönetimi: QBO bağlantı kopması, eksik veri, API hataları
+- [x] Hata yönetimi: QBO bağlantı kopması, eksik veri, API hataları
 - [ ] Loglama: temel structured logging kurulumu
-- [ ] Graceful degradation: QBO/Plaid (planned) kopması → stale data warning
+- [x] Graceful degradation: QBO/Plaid (planned) kopması → stale data warning
 - [ ] Graceful degradation: Stripe payment fail → past_due + Slack warning
 - [ ] Next.js middleware → proxy migration (deprecation fix)
 

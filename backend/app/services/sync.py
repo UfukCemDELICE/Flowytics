@@ -10,7 +10,8 @@ from backend.app.integrations.quickbooks import (
     get_profit_and_loss,
     get_balance_sheet,
     get_cash_flow,
-    IntegrationError
+    IntegrationError,
+    TokenExpiredError,
 )
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ async def sync_tenant(tenant_id: str, session: AsyncSession) -> dict:
     stmt = select(Integration).where(
         Integration.tenant_id == tenant_id,
         Integration.provider == "quickbooks",
-        Integration.sync_status == "active"
+        Integration.sync_status.in_(["active", "error"]),  # Allow retry from error state
     )
     result = await session.execute(stmt)
     integration = result.scalar_one_or_none()
@@ -84,6 +85,13 @@ async def sync_tenant(tenant_id: str, session: AsyncSession) -> dict:
         await session.commit()
         return {"status": "synced", "snapshots_created": len(snapshots)}
         
+    except TokenExpiredError as e:
+        logger.error(f"QBO token expired for tenant {tenant_id}: {str(e)}")
+        integration.sync_status = "disconnected"
+        integration.error_message = str(e)
+        await session.commit()
+        raise
+
     except IntegrationError as e:
         logger.error(f"Sync failed for tenant {tenant_id}: {str(e)}")
         integration.sync_status = "error"

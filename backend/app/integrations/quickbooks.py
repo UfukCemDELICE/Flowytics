@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timezone, timedelta
 from cryptography.fernet import Fernet
 from intuitlib.client import AuthClient
@@ -11,6 +12,7 @@ from backend.app.config import get_settings
 from backend.app.models.integration import Integration
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 # We need a stable key for encrypting tokens. For now, use a fallback or an env var.
 # But I will just mock/build the structure. Let's fix up later.
@@ -80,7 +82,7 @@ async def handle_callback(code: str, realm_id: str, tenant_id: str, session: Asy
 
 async def auto_refresh_token(integration: Integration, session: AsyncSession) -> dict:
     if not integration.credentials_encrypted:
-        raise Exception("No credentials to refresh")
+        raise TokenExpiredError("No credentials stored. Please reconnect QuickBooks.")
         
     fernet = get_fernet()
     tokens = json.loads(fernet.decrypt(integration.credentials_encrypted.encode()).decode())
@@ -92,8 +94,17 @@ async def auto_refresh_token(integration: Integration, session: AsyncSession) ->
         # Still valid
         return tokens
 
-    auth_client = get_auth_client()
-    auth_client.refresh(refresh_token=tokens["refresh_token"])
+    try:
+        auth_client = get_auth_client()
+        auth_client.refresh(refresh_token=tokens["refresh_token"])
+    except Exception as e:
+        logger.error(f"QBO token refresh failed for integration {integration.id}: {e}")
+        integration.sync_status = "disconnected"
+        integration.error_message = f"Token refresh failed: {str(e)}"
+        await session.commit()
+        raise TokenExpiredError(
+            f"QuickBooks connection expired. Please reconnect via the dashboard."
+        ) from e
     
     tokens.update({
         "access_token": auth_client.access_token,
@@ -107,7 +118,14 @@ async def auto_refresh_token(integration: Integration, session: AsyncSession) ->
     
     return tokens
 
+
 class IntegrationError(Exception):
+    """Base class for integration-related errors."""
+    pass
+
+
+class TokenExpiredError(IntegrationError):
+    """Raised when QBO OAuth tokens have expired and cannot be refreshed."""
     pass
 
 async def get_qbo_client(realm_id: str, session: AsyncSession) -> QuickBooks:
@@ -136,28 +154,29 @@ async def get_qbo_client(realm_id: str, session: AsyncSession) -> QuickBooks:
     except Exception as e:
         raise IntegrationError(f"Failed to initialize QuickBooks client: {str(e)}")
 
-async def get_profit_and_loss(realm_id: str, start_date: str, end_date: str, session: AsyncSession) -> dict:
+async def _fetch_report(realm_id: str, report_name: str, start_date: str, end_date: str, session: AsyncSession) -> dict:
+    """Shared helper to fetch a QBO report with proper error classification."""
     qb = await get_qbo_client(realm_id, session)
     try:
-        # python-quickbooks has get_report method doing the REST query
-        report = qb.get_report("ProfitAndLoss", qs={"start_date": start_date, "end_date": end_date})
+        report = qb.get_report(report_name, qs={"start_date": start_date, "end_date": end_date})
         return report
     except QuickbooksException as e:
-        raise IntegrationError(f"QuickBooks P&L request failed: {e.message}")
+        error_code = getattr(e, 'error_code', None) or getattr(e, 'status_code', None)
+        if error_code in (401, '401', 'unauthorized'):
+            raise TokenExpiredError(
+                f"QuickBooks returned 401 for {report_name}. Please reconnect."
+            ) from e
+        raise IntegrationError(f"QuickBooks {report_name} request failed: {e.message}") from e
+
+
+async def get_profit_and_loss(realm_id: str, start_date: str, end_date: str, session: AsyncSession) -> dict:
+    return await _fetch_report(realm_id, "ProfitAndLoss", start_date, end_date, session)
+
 
 async def get_balance_sheet(realm_id: str, start_date: str, end_date: str, session: AsyncSession) -> dict:
-    qb = await get_qbo_client(realm_id, session)
-    try:
-        report = qb.get_report("BalanceSheet", qs={"start_date": start_date, "end_date": end_date})
-        return report
-    except QuickbooksException as e:
-        raise IntegrationError(f"QuickBooks Balance Sheet request failed: {e.message}")
+    return await _fetch_report(realm_id, "BalanceSheet", start_date, end_date, session)
+
 
 async def get_cash_flow(realm_id: str, start_date: str, end_date: str, session: AsyncSession) -> dict:
-    qb = await get_qbo_client(realm_id, session)
-    try:
-        report = qb.get_report("CashFlow", qs={"start_date": start_date, "end_date": end_date})
-        return report
-    except QuickbooksException as e:
-        raise IntegrationError(f"QuickBooks Cash Flow request failed: {e.message}")
+    return await _fetch_report(realm_id, "CashFlow", start_date, end_date, session)
 

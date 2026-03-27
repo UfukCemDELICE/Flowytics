@@ -1,9 +1,11 @@
 import logging
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from sqlmodel import select
 
 from backend.app.database import _get_engine
 from backend.app.models.tenant import Tenant
+from backend.app.models.integration import Integration
 from backend.app.models.financial_snapshot import FinancialSnapshot
 from backend.app.integrations.slack import SlackClient
 
@@ -13,6 +15,8 @@ from backend.app.tools.runway import calculate_runway
 from backend.app.tools.anomaly import calculate_anomalies
 
 logger = logging.getLogger(__name__)
+
+STALE_DATA_THRESHOLD = timedelta(hours=48)
 
 async def run_proactive_alerts():
     """
@@ -34,6 +38,41 @@ async def run_proactive_alerts():
         
         for tenant in tenants:
             try:
+                # ── Data freshness gate ─────────────────────────
+                integ_stmt = select(Integration).where(
+                    Integration.tenant_id == tenant.id,
+                    Integration.provider == "quickbooks",
+                )
+                integ_res = await session.execute(integ_stmt)
+                integration = integ_res.scalar_one_or_none()
+
+                if not integration or integration.sync_status == "disconnected":
+                    channel = tenant.slack_channel_id or "#general"
+                    blocks = client.format_proactive_alert_block(
+                        "🔌 Your QuickBooks connection is disconnected. "
+                        "Please reconnect via the Flowytics dashboard to resume financial monitoring.",
+                        severity="critical",
+                    )
+                    await client.send_message(channel, "QuickBooks disconnected", blocks=blocks)
+                    logger.warning(f"Skipping tenant {tenant.id}: QBO disconnected")
+                    continue
+
+                if integration.last_synced_at:
+                    age = datetime.now(timezone.utc) - integration.last_synced_at
+                    if age > STALE_DATA_THRESHOLD:
+                        channel = tenant.slack_channel_id or "#general"
+                        days_ago = age.days
+                        blocks = client.format_proactive_alert_block(
+                            f"⚠️ Financial data is {days_ago} day(s) old. "
+                            f"Proactive analysis is paused until fresh data is available. "
+                            f"Please trigger a sync or reconnect QuickBooks.",
+                            severity="warning",
+                        )
+                        await client.send_message(channel, "Stale financial data", blocks=blocks)
+                        logger.info(f"Skipping tenant {tenant.id}: data stale ({days_ago}d)")
+                        continue
+                # ────────────────────────────────────────────────
+
                 # 1. Fetch latest P&L and Balance Sheet
                 pl_stmt = select(FinancialSnapshot).where(
                     FinancialSnapshot.tenant_id == tenant.id,

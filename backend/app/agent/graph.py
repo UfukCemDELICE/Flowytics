@@ -14,7 +14,7 @@ from backend.app.tools.cash_forecast import calculate_cash_forecast
 from backend.app.tools.anomaly import calculate_anomalies
 from backend.app.tools.scenario import calculate_scenario_impact
 from backend.app.tools.fundraising import calculate_fundraising_readiness
-from backend.app.tools.monthly_report import generate_monthly_report
+from backend.app.tools.monthly_report import generate_monthly_report_data
 
 active_tools = [
     calculate_burn_rate,
@@ -23,7 +23,7 @@ active_tools = [
     calculate_anomalies,
     calculate_scenario_impact,
     calculate_fundraising_readiness,
-    generate_monthly_report
+    generate_monthly_report_data
 ]
 
 tool_node = ToolNode(active_tools)
@@ -38,7 +38,7 @@ def load_prompt(filename: str) -> str:
 
 def call_model(state: AgentState) -> dict:
     messages = state["messages"]
-    model_name = state.get("recommended_model", "claude-3-5-sonnet-latest")
+    model_name = state.get("recommended_model", "claude-4-6-sonnet-latest")
     summary = state.get("financial_summary")
     
     llm = ChatAnthropic(model=model_name, temperature=0.0)

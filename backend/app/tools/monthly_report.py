@@ -1,26 +1,48 @@
+from typing import Dict, Any, List
 from langchain_core.tools import tool
-from typing import Dict, Any
+from pydantic import BaseModel
+from decimal import Decimal
+
+from backend.app.tools.schemas import (
+    FinancialSummary, 
+    BurnRateResult, 
+    RunwayResult, 
+    CashForecastResult,
+    AnomalyResult,
+    FundraisingResult
+)
+from backend.app.tools.burn_rate import calculate_burn_rate
+from backend.app.tools.runway import calculate_runway
+from backend.app.tools.cash_forecast import calculate_cash_forecast
+from backend.app.tools.anomaly import calculate_anomalies
+from backend.app.tools.fundraising import calculate_fundraising_readiness
+
+class MonthlyReportData(BaseModel):
+    """Structured deterministic mathematical container for the end of month CFO report."""
+    raw_summary: FinancialSummary
+    burn: BurnRateResult
+    runway: RunwayResult
+    forecast: CashForecastResult
+    anomalies: AnomalyResult
+    fundraising: FundraisingResult
 
 @tool
-def generate_monthly_report(tenant_id: str = "default") -> Dict[str, Any]:
+def generate_monthly_report_data(summary: FinancialSummary) -> MonthlyReportData:
     """
-    Generates a comprehensive monthly financial report by pulling high-level 
-    cash, burn, runway, and major outlier data for the current month.
+    Aggregates a complete deterministic dataset of the startup's current financial posture.
+    Invokes burn rate, runway, anomaly checking, and fundraising math tools.
     """
-    # In a real implementation, this would aggregate actual data from the DB/QBO
-    return {
-        "status": "success",
-        "report_month": "Current",
-        "executive_summary": "Financial position remains stable with 9.3 months of runway. Net burn has increased 18% due to recent operational expenses.",
-        "key_metrics": {
-            "current_cash": 383000.0,
-            "net_burn": 41200.0,
-            "runway_months": 9.3,
-            "gross_margin_pct": 72.0
-        },
-        "top_expenses": [
-            {"category": "Payroll", "amount": 25000.0, "trend": "up 15%"},
-            {"category": "Software Subscriptions", "amount": 4200.0, "trend": "stable"}
-        ],
-        "recommendation": "Monitor hiring velocity to preserve 6+ month runway threshold."
-    }
+    burn = calculate_burn_rate.invoke({"summary": summary})
+    runway = calculate_runway.invoke({"summary": summary, "burn_rate": burn})
+    forecast = calculate_cash_forecast.invoke({"summary": summary, "runway": runway})
+    anomalies = calculate_anomalies.invoke({"summary": summary})
+    fundraising = calculate_fundraising_readiness.invoke({"summary": summary})
+    
+    return MonthlyReportData(
+        raw_summary=summary,
+        burn=burn,
+        runway=runway,
+        forecast=forecast,
+        anomalies=anomalies,
+        fundraising=fundraising
+    )

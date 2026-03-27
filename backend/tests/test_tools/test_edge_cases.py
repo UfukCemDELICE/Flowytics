@@ -1,4 +1,3 @@
-import pytest
 from datetime import date
 from decimal import Decimal
 from backend.app.tools.burn_rate import calculate_burn_rate

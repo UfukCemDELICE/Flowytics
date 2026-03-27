@@ -31,15 +31,15 @@ Her hafta sonunda çalışan bir şey olmalı. "Çalışan" = test edilmiş, hat
 - [x] Intuit Developer sandbox oluşturuldu
 
 ### Kalan Tasklar
-- [ ] QBO sandbox env vars (.env'e QB_CLIENT_ID, QB_CLIENT_SECRET, QB_REDIRECT_URI ekle)
-- [ ] Config.py'ye QB_* env vars ekle
-- [ ] Clerk auth middleware (user_id + org_id extraction, 401 on invalid)
-- [ ] QBO OAuth flow (auth URL generation + callback + token save encrypted)
-- [ ] QBO data pull functions (P&L, Balance Sheet, Cash Flow → raw dict)
-- [ ] Sync service (QBO → financial_snapshots tablosuna JSONB olarak kaydet)
-- [ ] Manual sync endpoint (POST /api/v1/quickbooks/sync)
-- [ ] Router registration (main.py'de tüm route'ları include et)
-- [ ] Import path fix (backend.app.* prefix)
+- [x] QBO sandbox env vars (.env'e QB_CLIENT_ID, QB_CLIENT_SECRET, QB_REDIRECT_URI ekle)
+- [x] Config.py'ye QB_* env vars ekle
+- [x] Clerk auth middleware (user_id + org_id extraction, 401 on invalid)
+- [x] QBO OAuth flow (auth URL generation + callback + token save encrypted)
+- [x] QBO data pull functions (P&L, Balance Sheet, Cash Flow → raw dict)
+- [x] Sync service (QBO → financial_snapshots tablosuna JSONB olarak kaydet)
+- [x] Manual sync endpoint (POST /api/v1/quickbooks/sync)
+- [x] Router registration (main.py'de tüm route'ları include et)
+- [x] Import path fix (backend.app.* prefix)
 
 ### Doğrulama
 ```bash
@@ -65,14 +65,14 @@ SELECT count(*) FROM financial_snapshots; → 3 (profit_loss, balance_sheet, cas
 **Done tanımı:** QBO verisinden burn rate, runway, gross/net burn ve 13 haftalık cash forecast hesaplanabiliyor. Her tool'un testi var.
 
 ### Tasklar
-- [ ] Tool: `burn_rate.py` — net burn, gross burn, burn multiple, trend (linear regression slope)
-- [ ] Tool: `runway.py` — runway months, cash zero date, status (critical/warning/monitor/healthy)
-- [ ] Tool: `cash_forecast.py` — 13 haftalık nakit projeksiyonu (trend bazlı)
-- [ ] Tool: `get_financial_summary` — P&L ve bilanço özet çıkarma (Polars DataFrame ops)
-- [ ] Her tool için Pydantic input/output modelleri
-- [ ] Her tool `Decimal` kullanıyor (float yok) — test ile doğrula
-- [ ] Unit testler: her tool'un her code path'i test edilmiş (edge cases dahil)
-- [ ] Test fixtures: 5 startup profili (healthy, pre-revenue, dying, profitable, new)
+- [x] Tool: `burn_rate.py` — net burn, gross burn, burn multiple, trend (linear regression slope)
+- [x] Tool: `runway.py` — runway months, cash zero date, status (critical/warning/monitor/healthy)
+- [x] Tool: `cash_forecast.py` — 13 haftalık nakit projeksiyonu (trend bazlı)
+- [x] Tool: `get_financial_summary` — P&L ve bilanço özet çıkarma (Polars DataFrame ops)
+- [x] Her tool için Pydantic input/output modelleri
+- [x] Her tool `Decimal` kullanıyor (float yok) — test ile doğrula
+- [x] Unit testler: her tool'un her code path'i test edilmiş (edge cases dahil)
+- [x] Test fixtures: 5 startup profili (healthy, pre-revenue, dying, profitable, new)
 
 ### Doğrulama
 ```bash
@@ -92,16 +92,16 @@ uv run pytest tests/test_tools/ -v --cov=backend/app/tools --cov-report=term-mis
 **Done tanımı:** Sistem anomali tespit edebiliyor ve "X kişi daha alırsak runway ne olur?" sorusuna cevap verebiliyor.
 
 ### Tasklar
-- [ ] Tool: `anomaly.py` — Z-score analizi per category per month (threshold: 2.0σ)
-- [ ] Tool: `scenario.py` — parametre değişikliğinin runway/burn'e etkisi (hire, fire, revenue, expense)
-- [ ] Tool: `fundraising.py` — readiness score (0-100), investor metrics, gaps
-- [ ] Claude Opus entegrasyonu: doğal dil soru → tool çağrısı → doğal dil cevap
-- [ ] LangGraph agent graph skeleton (state schema, tool registration)
-- [ ] Model routing logic (select_model function — Haiku/Sonnet/Opus)
-- [ ] Cross-validation logic (tool numbers vs LLM numbers)
-- [ ] Prompt dosyaları oluştur: `system_base.txt`, `scenario_analysis.txt`, `anomaly_interpretation.txt`
-- [ ] Senaryo testleri: 5 farklı what-if sorusuyla doğruluk kontrolü
-- [ ] Anomaly testleri: bilinen anomalili veri seti ile tespit doğrulaması
+- [x] Tool: `anomaly.py` — Z-score analizi per category per month (threshold: 2.0σ)
+- [x] Tool: `scenario.py` — parametre değişikliğinin runway/burn'e etkisi (hire, fire, revenue, expense)
+- [x] Tool: `fundraising.py` — readiness score (0-100), investor metrics, gaps
+- [x] Claude Opus entegrasyonu: doğal dil soru → tool çağrısı → doğal dil cevap
+- [x] LangGraph agent graph skeleton (state schema, tool registration)
+- [x] Model routing logic (select_model function — Haiku/Sonnet/Opus)
+- [x] Cross-validation logic (tool numbers vs LLM numbers)
+- [x] Prompt dosyaları oluştur: `system_base.txt`, `scenario_analysis.txt`, `anomaly_interpretation.txt`
+- [x] Senaryo testleri: 5 farklı what-if sorusuyla doğruluk kontrolü
+- [x] Anomaly testleri: bilinen anomalili veri seti ile tespit doğrulaması
 
 ### Doğrulama
 ```python
@@ -126,18 +126,18 @@ detect_anomalies(data_with_known_spike)
 **Done tanımı:** Slack bot çalışıyor, soru cevaplayabiliyor ve kritik eşik uyarısı atabiliyor.
 
 ### Tasklar
-- [ ] Slack App oluştur (api.slack.com), bot token + signing secret al
-- [ ] Slack Bolt FastAPI'ye mount et (ASGI adapter)
-- [ ] Slack → LangGraph: kullanıcı sorusu alınıp agent'a iletiliyor
-- [ ] LangGraph → Slack: cevap formatlanıp Slack Block Kit ile dönüyor
-- [ ] Haiku entegrasyonu: Slack konuşmaları için hızlı yanıt
-- [ ] Sonnet/Opus upgrade: trigger words tespit edilince model switch
-- [ ] Proaktif uyarı: APScheduler ile günlük eşik kontrolü
-- [ ] Uyarı kuralları: runway < 4 ay, burn rate MoM > %25 artış, büyük tek seferlik harcama
-- [ ] Slack mesaj formatlaması: Block Kit ile okunabilir finansal uyarılar
-- [ ] 3-saniye kuralı: Slack event acknowledge → BackgroundTasks ile async agent run
-- [ ] slack_messages tablosuna loglama (direction, content, agent_run_id)
-- [ ] slack_user_map tablosuna kullanıcı mapping
+- [x] Slack App oluştur (api.slack.com), bot token + signing secret al
+- [x] Slack Bolt FastAPI'ye mount et (ASGI adapter)
+- [x] Slack → LangGraph: kullanıcı sorusu alınıp agent'a iletiliyor
+- [x] LangGraph → Slack: cevap formatlanıp Slack Block Kit ile dönüyor
+- [x] Haiku entegrasyonu: Slack konuşmaları için hızlı yanıt
+- [x] Sonnet/Opus upgrade: trigger words tespit edilince model switch
+- [x] Proaktif uyarı: APScheduler ile günlük eşik kontrolü
+- [x] Uyarı kuralları: runway < 4 ay, burn rate MoM > %25 artış, büyük tek seferlik harcama
+- [x] Slack mesaj formatlaması: Block Kit ile okunabilir finansal uyarılar
+- [x] 3-saniye kuralı: Slack event acknowledge → BackgroundTasks ile async agent run
+- [x] slack_messages tablosuna loglama (direction, content, agent_run_id)
+- [x] slack_user_map tablosuna kullanıcı mapping
 
 ### Doğrulama
 ```
@@ -163,15 +163,15 @@ Slack'te yaz: "What if I hire 2 engineers?"
 **Done tanımı:** Sistem aylık kapsamlı CFO raporunu otomatik oluşturup Slack'e atabiliyor.
 
 ### Tasklar
-- [ ] Tool: `monthly_report.py` — tüm tool çıktılarını aggregate et
-- [ ] Claude Sonnet entegrasyonu: rapor formatlaması ve doğal dil özet
-- [ ] Board-style executive summary formatı
-- [ ] Investor metrik hesaplamaları: MRR, ARR, growth rate, burn multiple
-- [ ] Rapor scheduler: ayın ilk iş günü otomatik Slack'e gönderim (APScheduler)
-- [ ] Rapor formatı: Slack Block Kit ile görsel olarak zengin mesaj (sections, dividers, metrics)
-- [ ] Prompt dosyası: `report_generation.txt`
-- [ ] computed_metrics tablosuna rapor cache'leme
-- [ ] agent_runs tablosuna rapor generation logu
+- [x] Tool: `monthly_report.py` — tüm tool çıktılarını aggregate et
+- [x] Claude Sonnet entegrasyonu: rapor formatlaması ve doğal dil özet
+- [x] Board-style executive summary formatı
+- [x] Investor metrik hesaplamaları: MRR, ARR, growth rate, burn multiple
+- [x] Rapor scheduler: ayın ilk iş günü otomatik Slack'e gönderim (APScheduler)
+- [x] Rapor formatı: Slack Block Kit ile görsel olarak zengin mesaj (sections, dividers, metrics)
+- [x] Prompt dosyası: `report_generation.txt`
+- [x] computed_metrics tablosuna rapor cache'leme
+- [x] agent_runs tablosuna rapor generation logu
 
 ### Doğrulama
 ```
@@ -199,14 +199,14 @@ Scheduler tetiklenir (veya manuel trigger)
 **Done tanımı:** Yeni kullanıcı kayıt olup QBO'sunu bağlayabiliyor, 24 saat içinde ilk Slack mesajını alıyor.
 
 ### Tasklar
-- [ ] Onboarding UI: 5-step wizard (Clerk → Stripe → QBO → Bank → Slack → Done)
-- [ ] Stripe Checkout Session: $150/ay, 14 gün trial
-- [ ] Stripe webhook handler: `checkout.session.completed`, `customer.subscription.updated`, `invoice.payment_failed`
-- [ ] Tenant lifecycle: trial → active → past_due → cancelled → churned
-- [ ] Grace period: 14 gün past_due sonra cancelled
-- [ ] QBO connect: direkt QBO OAuth redirect
+- [x] Onboarding UI: 5-step wizard (Clerk → Stripe → QBO → Bank → Slack → Done)
+- [x] Stripe Checkout Session: $150/ay, 14 gün trial
+- [x] Stripe webhook handler: `checkout.session.completed`, `customer.subscription.updated`, `invoice.payment_failed`
+- [x] Tenant lifecycle: trial → active → past_due → cancelled → churned
+- [x] Grace period: 14 gün past_due sonra cancelled
+- [x] QBO connect: direkt QBO OAuth redirect
 - [ ] Plaid connect: Plaid Link embed (optional, skip allowed)
-- [ ] Slack connect: "Add to Slack" OAuth button
+- [x] Slack connect: "Add to Slack" OAuth button
 - [ ] İlk bağlantı sonrası otomatik veri çekme ve ilk rapor oluşturma
 - [ ] Hoşgeldin mesajı: "✅ Connected. First report in 24h."
 - [ ] End-to-end test: Signup → Connect → Sync → Slack report

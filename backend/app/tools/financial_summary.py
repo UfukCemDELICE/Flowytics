@@ -1,6 +1,6 @@
 import polars as pl
 from decimal import Decimal
-from datetime import date, datetime
+from datetime import datetime
 from langchain_core.tools import tool
 from backend.app.tools.schemas import FinancialSummary, MonthlyFinancial
 

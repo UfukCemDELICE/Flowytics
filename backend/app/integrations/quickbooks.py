@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from quickbooks import QuickBooks
 from quickbooks.exceptions import QuickbooksException
-from sqlmodel import select
 
 from backend.app.config import get_settings
 from backend.app.models.integration import Integration

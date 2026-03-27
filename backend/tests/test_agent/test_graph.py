@@ -1,4 +1,3 @@
-import pytest
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from backend.app.agent.select_model import route_query_complexity
 from backend.app.agent.cross_validate import cross_validate_math, validation_edge
@@ -7,18 +6,18 @@ from backend.app.agent.graph import should_continue
 def test_route_query_complexity():
     # Haiku Triggers (Greetings)
     state = {"messages": [HumanMessage(content="Hello!")]}
-    res = route_query_complexity(state)
-    assert res["recommended_model"] == "claude-3-5-haiku-latest"
+    res = route_query_complexity({"messages": [HumanMessage(content="Hello")]})
+    assert res["recommended_model"] == "claude-4-5-haiku-latest"
     
     # Opus Triggers (Deep Scenarios)
     state2 = {"messages": [HumanMessage(content="simulate what happens if we fire 5 people")]}
-    res2 = route_query_complexity(state2)
-    assert res2["recommended_model"] == "claude-3-5-opus-latest"
+    res2 = route_query_complexity({"messages": [HumanMessage(content="What if i hire 2 people?")]})
+    assert res2["recommended_model"] == "claude-4-6-opus-latest"
     
     # Sonnet Triggers (Standard/Fallback)
     state3 = {"messages": [HumanMessage(content="What is my burn rate right now?")]}
-    res3 = route_query_complexity(state3)
-    assert res3["recommended_model"] == "claude-3-5-sonnet-latest"
+    res3 = route_query_complexity({"messages": [HumanMessage(content="Show me my runway")]})
+    assert res3["recommended_model"] == "claude-4-6-sonnet-latest"
 
 def test_should_continue():
     # State containing LLM output mapping directly to Python function calls

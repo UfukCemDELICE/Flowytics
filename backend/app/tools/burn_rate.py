@@ -1,5 +1,4 @@
 from decimal import Decimal
-from typing import Literal
 
 from langchain_core.tools import tool
 from backend.app.tools.schemas import BurnRateResult, FinancialSummary

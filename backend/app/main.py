@@ -3,15 +3,24 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from backend.app.api.v1 import me, quickbooks, stripe, slack
+from backend.app.services.proactive_alerts import run_proactive_alerts
+from backend.app.services.monthly_report import run_monthly_reports
 
+scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Startup: scheduler and Slack bot will be initialised here
+    # Startup: Initialize scheduler and Slack proactive alerts
+    scheduler.add_job(run_proactive_alerts, 'cron', hour=9, minute=0)
+    scheduler.add_job(run_monthly_reports, 'cron', day=1, hour=9, minute=0)
+    scheduler.start()
     yield
     # Shutdown: cleanup goes here
+    scheduler.shutdown()
 
 
 app = FastAPI(
@@ -34,8 +43,6 @@ app.include_router(quickbooks.router, prefix="/api/v1")
 app.include_router(stripe.router, prefix="/api/v1")
 app.include_router(slack.router, prefix="/api/v1")
 
-
-from fastapi.responses import RedirectResponse
 
 @app.get("/", include_in_schema=False)
 async def root():

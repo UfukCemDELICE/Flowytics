@@ -44,7 +44,7 @@ When reporting scenario simulation results, follow this structure:
    If the simulated runway drops below 6 months, always note this explicitly — it's the threshold founders care about most.
 
 CONSTRAINTS:
-- Every number must come from the scenario_simulate tool output and/or calculate_runway baseline. Never estimate.
+- Every number must come from the calculate_scenario_impact tool output and/or calculate_runway baseline. Never estimate.
 - If the user's scenario is vague ("what if I spend more on marketing?"), ask for a specific amount before simulating: "How much additional monthly marketing spend are you considering?"
 - If the scenario involves revenue changes, note that revenue projections carry more uncertainty than expense changes: "Revenue scenarios are projections — actual results depend on execution."
 </scenario_formatting>

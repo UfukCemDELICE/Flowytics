@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Mapping
 
@@ -112,6 +111,6 @@ async def stripe_webhook(
                 
     except Exception as e:
         logger.error(f"Error processing webhook: {e}")
-        return {"error": "Processing failed"}
+        raise HTTPException(status_code=500, detail={"error": "processing_failed", "message": "Webhook processing failed"})
 
     return {"status": "success"}

@@ -7,6 +7,14 @@ class Settings(BaseSettings):
     # Database (Supabase Postgres direct connection via asyncpg)
     DATABASE_URL: str = ""
 
+    # Logging
+    LOG_LEVEL: str = "INFO"      # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    LOG_FORMAT: str = "auto"     # "auto" (TTY=dev, non-TTY=json), "json", "dev"
+
+    # Security
+    FERNET_KEY: str = ""         # 32-byte base64-encoded key for Fernet encryption
+    FRONTEND_URL: str = "http://localhost:3000"  # For CORS and redirect URLs
+
     # Anthropic
     ANTHROPIC_API_KEY: str = ""
 
@@ -36,6 +44,8 @@ class Settings(BaseSettings):
     SLACK_BOT_TOKEN: str = ""
     SLACK_SIGNING_SECRET: str = ""
     SLACK_APP_TOKEN: str = ""
+    SLACK_CLIENT_ID: str = ""
+    SLACK_CLIENT_SECRET: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

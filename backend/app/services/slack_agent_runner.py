@@ -95,7 +95,10 @@ async def process_slack_message(event: dict):
         tenant = result.scalar_one_or_none()
         
         if not tenant:
-            logger.warning(f"Message from unknown team_id {team_id}")
+            logger.warning(
+                "Message from unknown Slack team",
+                extra={"event": "unknown_team", "service": "slack_agent", "org_id": team_id},
+            )
             await client.send_reply(channel, thread_ts, "I am not connected to a Flowytics account. Please complete onboarding first.")
             return
 
@@ -142,7 +145,12 @@ async def process_slack_message(event: dict):
         
         if should_block:
             # Integration is missing or broken — don't call the agent at all
-            await client.send_reply(channel, thread_ts, warning_msg)
+            error_blocks = client.format_error_block(
+                title="Cannot Process Request",
+                message=warning_msg,
+                cta="<http://localhost:3000/onboarding/accounting|Connect QuickBooks>",
+            )
+            await client.send_reply(channel, thread_ts, warning_msg, blocks=error_blocks)
             agent_run.is_successful = False
             agent_run.error_message = warning_msg
             await session.commit()
@@ -156,13 +164,20 @@ async def process_slack_message(event: dict):
             
             final_message = result["messages"][-1].content
             
-            # Prepend stale data warning if applicable
-            if warning_msg:
-                final_message = f"{warning_msg}\n\n---\n\n{final_message}"
+            # Build response blocks
+            response_blocks = []
             
-            # Send message back to slack
-            blocks = client.format_cfo_response_block(final_message)
-            await client.send_reply(channel, thread_ts, text=final_message, blocks=blocks)
+            # Prepend stale data warning banner if applicable
+            if warning_msg:
+                response_blocks.extend(client.format_stale_data_warning_block(warning_msg))
+            
+            # Add the main CFO response
+            response_blocks.extend(client.format_cfo_response_block(final_message))
+            
+            # Fallback text for notifications
+            fallback = f"{warning_msg}\n\n{final_message}" if warning_msg else final_message
+            
+            await client.send_reply(channel, thread_ts, text=fallback, blocks=response_blocks)
             
             # Log bot response
             out_msg = SlackMessage(
@@ -171,7 +186,7 @@ async def process_slack_message(event: dict):
                 slack_channel_id=channel,
                 slack_thread_ts=thread_ts,
                 slack_user_id=None,
-                slack_ts=None, # In reality we'd grab the outbound message ts from the API response
+                slack_ts=None,
                 direction="outbound",
                 content=final_message,
                 is_bot=True,
@@ -184,19 +199,32 @@ async def process_slack_message(event: dict):
             await session.commit()
 
         except (TokenExpiredError, IntegrationError) as e:
-            logger.error(f"QBO integration error for tenant {tenant.id}: {str(e)}", exc_info=True)
-            error_reply = (
-                "⚠️ There's a problem with your QuickBooks connection.\n\n"
-                f"*Details:* {str(e)}\n\n"
-                "Please reconnect QuickBooks via the Flowytics dashboard: "
-                "http://localhost:3000/onboarding/accounting"
+            logger.error(
+                "QBO integration error during agent invocation",
+                extra={"tenant_id": tenant.id, "error_type": type(e).__name__, "provider": "quickbooks"},
+                exc_info=True,
             )
-            await client.send_reply(channel, thread_ts, error_reply)
+            error_blocks = client.format_error_block(
+                title="QuickBooks Connection Problem",
+                message=f"*Details:* {str(e)}",
+                cta="<http://localhost:3000/onboarding/accounting|Reconnect QuickBooks>",
+            )
+            error_text = f"⚠️ QuickBooks connection error: {str(e)}"
+            await client.send_reply(channel, thread_ts, error_text, blocks=error_blocks)
             agent_run.error_message = str(e)
             await session.commit()
 
         except Exception as e:
-            logger.error(f"Agent failed for tenant {tenant.id}: {str(e)}", exc_info=True)
-            await client.send_reply(channel, thread_ts, "I encountered an error processing your request. Please try again later.")
+            logger.error(
+                "Agent invocation failed",
+                extra={"tenant_id": tenant.id, "error_type": type(e).__name__, "service": "langgraph"},
+                exc_info=True,
+            )
+            error_blocks = client.format_error_block(
+                title="Processing Error",
+                message="I encountered an error processing your request. Please try again later.",
+            )
+            await client.send_reply(channel, thread_ts, "Processing error — please try again.", blocks=error_blocks)
             agent_run.error_message = str(e)
             await session.commit()
+

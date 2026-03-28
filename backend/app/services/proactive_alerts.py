@@ -104,8 +104,8 @@ async def run_proactive_alerts():
                     continue
                 
                 # 2. Run Tools
-                runway = calculate_runway.invoke({"summary": summary})
                 burn = calculate_burn_rate.invoke({"summary": summary})
+                runway = calculate_runway.invoke({"summary": summary, "burn_rate": burn})
                 anomalies = calculate_anomalies.invoke({"summary": summary})
                 
                 alerts = []
@@ -116,7 +116,7 @@ async def run_proactive_alerts():
                     
                 # Rule B: Burn Rate increase > 25%
                 if len(summary.monthly_financials) >= 2:
-                    current_burn = burn.net_burn
+                    current_burn = burn.net_burn_monthly
                     # Re-calculate to find previous burn (simplify for MVP: just read from monthly totals)
                     prev_month = summary.monthly_financials[-2]
                     prev_burn = prev_month.total_expenses - prev_month.total_revenue

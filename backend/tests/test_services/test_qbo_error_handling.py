@@ -75,6 +75,7 @@ async def test_auto_refresh_marks_disconnected_on_refresh_failure():
 
     with patch("backend.app.integrations.quickbooks.settings") as mock_settings:
         mock_settings.CLERK_SECRET_KEY = "test_secret_key_32_chars_longggg"
+        mock_settings.FERNET_KEY = ""  # Force SHA-256 fallback
         mock_settings.QB_CLIENT_ID = "cid"
         mock_settings.QB_CLIENT_SECRET = "csec"
         mock_settings.QB_REDIRECT_URI = "http://localhost"
@@ -211,8 +212,9 @@ async def test_background_first_sync_calls_sync_tenant():
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)):
         with patch("backend.app.api.v1.quickbooks.sync_tenant", new_callable=AsyncMock) as mock_sync:
             mock_sync.return_value = {"status": "synced", "snapshots_created": 3}
-            await _background_first_sync("org-123")
-            mock_sync.assert_awaited_once_with("org-123", mock_session)
+            with patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock):
+                await _background_first_sync("org-123")
+                mock_sync.assert_awaited_once_with("org-123", mock_session)
 
 
 @pytest.mark.asyncio

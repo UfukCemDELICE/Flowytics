@@ -16,13 +16,15 @@ def calculate_cash_forecast(summary: FinancialSummary) -> CashForecastResult:
 
     # Use the last 3 months to configure a baseline weekly rate
     recent = financials[-3:] if len(financials) >= 3 else financials
+    recent_count = Decimal(str(len(recent)))
     
-    avg_monthly_inflow = sum((d.total_revenue for d in recent), start=Decimal("0")) / Decimal(str(len(recent)))
-    avg_monthly_outflow = sum((d.total_expenses for d in recent), start=Decimal("0")) / Decimal(str(len(recent)))
+    avg_monthly_inflow = sum((d.total_revenue for d in recent), start=Decimal("0")) / recent_count
+    avg_monthly_outflow = sum((d.total_expenses for d in recent), start=Decimal("0")) / recent_count
 
-    # Convert to weekly base
-    base_weekly_inflow = avg_monthly_inflow / Decimal("4.33")
-    base_weekly_outflow = avg_monthly_outflow / Decimal("4.33")
+    # Convert to weekly base (avg ~4.33 weeks per month)
+    weeks_per_month = Decimal("4.33")
+    base_weekly_inflow = avg_monthly_inflow / weeks_per_month
+    base_weekly_outflow = avg_monthly_outflow / weeks_per_month
 
     # For trend, we can just use the flat base for the MVP 13-week projection.
     # Advanced: calculate weekly growth rates. We will stick to flat for reliability in this sprint.
@@ -39,7 +41,7 @@ def calculate_cash_forecast(summary: FinancialSummary) -> CashForecastResult:
         current_balance = current_balance + projected_inflow - projected_outflow
         current_balance = current_balance.quantize(Decimal("0.01"))
 
-        if current_balance <= 0 and zero_cash_week is None:
+        if current_balance < 0 and zero_cash_week is None:
             zero_cash_week = i + 1
 
         weeks.append(WeekProjection(

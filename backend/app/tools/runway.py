@@ -21,6 +21,16 @@ def calculate_runway(summary: FinancialSummary, burn_rate: BurnRateResult) -> Ru
             cash_zero_date=None
         )
 
+    # Negative cash = already past zero
+    if cash <= Decimal("0"):
+        return RunwayResult(
+            runway_months=Decimal("0"),
+            cash_balance=cash,
+            monthly_net_burn=net_burn,
+            runway_status="critical",
+            cash_zero_date=date.today()
+        )
+
     runway_months = cash / net_burn
     
     if runway_months < Decimal("3"):

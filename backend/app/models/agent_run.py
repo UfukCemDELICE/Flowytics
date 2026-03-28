@@ -10,6 +10,9 @@ class AgentRun(SQLModel, table=True):
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
     trigger_type: str  # CHECK: scheduled, slack_message, webhook, manual
     trigger_payload: dict | None = Field(default=None, sa_column=Column(JSON))
+    query: str | None = Field(default=None)
+    response: str | None = Field(default=None)
+    is_successful: bool = Field(default=False)
     status: str = Field(default="running")  # CHECK: running, completed, failed
     tools_called: list = Field(default=[], sa_column=Column(JSON))
     model_used: str | None = Field(default=None)
@@ -19,4 +22,6 @@ class AgentRun(SQLModel, table=True):
     duration_ms: int | None = Field(default=None)
     output_result: dict | None = Field(default=None, sa_column=Column(JSON))
     error: str | None = Field(default=None)
+    error_message: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+

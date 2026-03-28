@@ -12,6 +12,26 @@ def calculate_scenario_impact(summary: FinancialSummary, changes: list[ScenarioC
     Positive monthly_impact values denote increased costs/worse burn.
     Negative monthly_impact values denote savings/increased revenue matching improved burn.
     """
+    # Guard: no financial data
+    if not summary.monthly_financials:
+        total_impact = sum(c.monthly_impact for c in changes)
+        cash = summary.current_cash_balance
+        if total_impact <= Decimal("0"):
+            new_runway = Decimal("9999")
+        elif cash <= Decimal("0"):
+            new_runway = Decimal("0")
+        else:
+            new_runway = (cash / total_impact).quantize(Decimal("0.01"))
+        return ScenarioResult(
+            current_runway=Decimal("9999"),
+            new_runway=new_runway,
+            delta_runway=new_runway - Decimal("9999"),
+            current_burn=Decimal("0"),
+            new_burn=total_impact,
+            delta_burn=total_impact,
+            changes_applied=changes,
+        )
+
     # 1. Establish the baseline
     base_burn = calculate_burn_rate.invoke({"summary": summary})
     base_runway = calculate_runway.invoke({"summary": summary, "burn_rate": base_burn})

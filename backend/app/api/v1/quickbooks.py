@@ -19,11 +19,14 @@ logger = logging.getLogger(__name__)
 async def _background_first_sync(org_id: str):
     """Background task: pull QBO data immediately after OAuth connect."""
     from backend.app.database import _get_engine
+    from backend.app.services.onboarding_welcome import send_welcome_message_if_ready
     _, session_factory = _get_engine()
     async with session_factory() as bg_session:
         try:
             result = await sync_tenant(org_id, bg_session)
             logger.info(f"Auto first-sync completed for org {org_id}: {result}")
+            # Check if all onboarding milestones are met → send welcome
+            await send_welcome_message_if_ready(org_id, bg_session)
         except Exception as e:
             logger.error(f"Auto first-sync failed for org {org_id}: {e}")
 
@@ -52,9 +55,10 @@ async def oauth_callback(
         if not org_id:
             raise ValueError("org_id missing in token")
     except Exception as e:
+        logger.warning(f"QBO OAuth state validation failed: {e}")
         raise HTTPException(
             status_code=400, 
-            detail={"error": "invalid_state", "message": f"State token validation failed: {str(e)}"}
+            detail={"error": "invalid_state", "message": "OAuth state token is invalid or expired."}
         )
 
     try:
@@ -63,7 +67,8 @@ async def oauth_callback(
         asyncio.create_task(_background_first_sync(org_id))
         return RedirectResponse(url="http://localhost:3000/dashboard")
     except quickbooks.IntegrationError as e:
-        raise HTTPException(status_code=502, detail={"error": "upstream_error", "message": str(e)})
+        logger.error(f"QBO callback upstream error: {e}")
+        raise HTTPException(status_code=502, detail={"error": "upstream_error", "message": "Could not connect to QuickBooks. Please try again."})
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": "internal_error", "message": "QuickBooks OAuth exchange failed."})
 
@@ -77,6 +82,8 @@ async def sync_quickbooks_data(
         result = await sync_tenant(user["org_id"], session)
         return result
     except quickbooks.IntegrationError as e:
-        raise HTTPException(status_code=502, detail=f"Integration Error: {str(e)}")
+        logger.error(f"QBO sync integration error for org {user['org_id']}: {e}")
+        raise HTTPException(status_code=502, detail={"error": "integration_error", "message": "QuickBooks sync failed. Please reconnect if the problem persists."})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal Error: {str(e)}")
+        logger.error(f"QBO sync internal error for org {user['org_id']}: {e}")
+        raise HTTPException(status_code=500, detail={"error": "internal_error", "message": "An unexpected error occurred during sync."})

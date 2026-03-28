@@ -17,10 +17,20 @@ logger = logging.getLogger(__name__)
 # We need a stable key for encrypting tokens. For now, use a fallback or an env var.
 # But I will just mock/build the structure. Let's fix up later.
 def get_fernet():
-    # In production this must be a stable base64 32-byte key. 
-    # For now we use the Clerk secret key to derive a valid 32-url-safe-base64 key
+    """
+    Returns a Fernet cipher for encrypting/decrypting QBO tokens.
+    Prefers a dedicated FERNET_KEY env var; falls back to deriving from CLERK_SECRET_KEY.
+    """
+    if settings.FERNET_KEY:
+        return Fernet(settings.FERNET_KEY.encode())
+    
+    # Fallback: derive from Clerk key (log warning — not recommended for production)
     import base64
     import hashlib
+    logger.warning(
+        "FERNET_KEY not set — deriving encryption key from CLERK_SECRET_KEY. "
+        "Set FERNET_KEY for production use."
+    )
     key = hashlib.sha256(settings.CLERK_SECRET_KEY.encode()).digest()
     return Fernet(base64.urlsafe_b64encode(key))
 
@@ -98,7 +108,11 @@ async def auto_refresh_token(integration: Integration, session: AsyncSession) ->
         auth_client = get_auth_client()
         auth_client.refresh(refresh_token=tokens["refresh_token"])
     except Exception as e:
-        logger.error(f"QBO token refresh failed for integration {integration.id}: {e}")
+        logger.error(
+            "QBO token refresh failed",
+            extra={"tenant_id": integration.tenant_id, "provider": "quickbooks", "error_type": "token_refresh_failed"},
+            exc_info=True,
+        )
         integration.sync_status = "disconnected"
         integration.error_message = f"Token refresh failed: {str(e)}"
         await session.commit()

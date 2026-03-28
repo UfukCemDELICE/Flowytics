@@ -18,6 +18,20 @@ from backend.app.services.slack_agent_runner import process_slack_message
 router = APIRouter(prefix="/slack", tags=["slack"])
 logger = logging.getLogger(__name__)
 
+
+async def _background_welcome_check(org_id: str):
+    """Background task: check if welcome message should be sent after Slack connect."""
+    from backend.app.database import _get_engine
+    from backend.app.services.onboarding_welcome import send_welcome_message_if_ready
+    _, session_factory = _get_engine()
+    async with session_factory() as bg_session:
+        try:
+            await send_welcome_message_if_ready(org_id, bg_session)
+        except Exception as e:
+            logger.error(f"Welcome check failed after Slack connect for org {org_id}: {e}")
+
+
+
 # Bolt Adapter
 slack_handler = AsyncSlackRequestHandler(slack_app)
 
@@ -73,6 +87,8 @@ async def oauth_redirect(
             tenant.slack_team_id = team_id
             session.add(tenant)
             await session.commit()
+            # Check if all onboarding milestones are met → send welcome
+            asyncio.create_task(_background_welcome_check(tenant.clerk_org_id))
             
         return RedirectResponse(url="http://localhost:3000/dashboard")
         
@@ -96,10 +112,14 @@ async def slack_events(request: Request) -> Response:
     return await slack_handler.handle(request)
 
 @router.post("/trigger_monthly_report")
-async def trigger_monthly_report(tenant_id: int):
+async def trigger_monthly_report(
+    tenant_id: str,
+    user: dict = Depends(get_current_user),
+):
     """
-    Diagnostic hidden endpoint to trigger the end-of-month AI generation
+    Diagnostic endpoint to trigger the end-of-month AI generation
     for a specific tenant without waiting for the CRON schedule.
+    Requires authentication.
     """
     from backend.app.services.monthly_report import run_monthly_reports
     import asyncio

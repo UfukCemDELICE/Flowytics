@@ -21,19 +21,33 @@ def parse_qbo_to_financial_summary(pl_data: dict, bs_data: dict) -> FinancialSum
     
     # Dummy logic to construct standard MonthlyFinancial list
     # Let's say we have 'monthly_data' array passed inside the snapshot metadata for ease:
-    if "monthly_data" in pl_data:
-        df = pl.DataFrame(pl_data["monthly_data"])
+    if "monthly_data" in pl_data and pl_data["monthly_data"]:
+        try:
+            df = pl.DataFrame(pl_data["monthly_data"])
+        except Exception:
+            # Malformed data: fall through to empty summary
+            return FinancialSummary(current_cash_balance=Decimal("0"), monthly_financials=[])
         
         financials = []
         for row in df.iter_rows(named=True):
-            financials.append(MonthlyFinancial(
-                month_start=datetime.strptime(row["month"], "%Y-%m").date(),
-                total_revenue=Decimal(str(row["revenue"])),
-                total_expenses=Decimal(str(row["expenses"])),
-                net_income=Decimal(str(row["net_income"]))
-            ))
+            try:
+                revenue = Decimal(str(row.get("revenue", "0") or "0"))
+                expenses = Decimal(str(row.get("expenses", "0") or "0"))
+                net_income = Decimal(str(row.get("net_income", "0") or "0"))
+                month_str = row.get("month", "")
+                if not month_str:
+                    continue
+                financials.append(MonthlyFinancial(
+                    month_start=datetime.strptime(month_str, "%Y-%m").date(),
+                    total_revenue=revenue,
+                    total_expenses=expenses,
+                    net_income=net_income
+                ))
+            except (ValueError, TypeError, KeyError):
+                # Skip malformed rows rather than crashing the entire parse
+                continue
             
-        current_cash = Decimal(str(bs_data.get("current_cash_balance", "0.00")))
+        current_cash = Decimal(str(bs_data.get("current_cash_balance", "0") or "0"))
         
         return FinancialSummary(
             current_cash_balance=current_cash,

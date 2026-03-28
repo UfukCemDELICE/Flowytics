@@ -48,7 +48,10 @@ async def stripe_webhook(
     try:
         event = verify_webhook(payload, sig_header)
     except Exception as e:
-        logger.error(f"Webhook signature failed: {e}")
+        logger.error(
+            "Stripe webhook signature verification failed",
+            extra={"event": "webhook_signature_failed", "provider": "stripe", "error_type": type(e).__name__},
+        )
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     event_type = event.get("type")
@@ -73,7 +76,10 @@ async def stripe_webhook(
                     db.add(tenant)
                     await db.commit()
                 else:
-                    logger.error(f"Tenant not found for clerk_org_id: {clerk_org_id}")
+                    logger.error(
+                        "Tenant not found for Stripe checkout",
+                        extra={"event": "tenant_not_found", "org_id": clerk_org_id, "provider": "stripe"},
+                    )
 
         elif event_type == "customer.subscription.updated":
             subscription = event["data"]["object"]
@@ -110,7 +116,11 @@ async def stripe_webhook(
                 await db.commit()
                 
     except Exception as e:
-        logger.error(f"Error processing webhook: {e}")
+        logger.error(
+            "Stripe webhook processing error",
+            extra={"event": "webhook_processing_error", "provider": "stripe", "error_type": type(e).__name__},
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail={"error": "processing_failed", "message": "Webhook processing failed"})
 
     return {"status": "success"}

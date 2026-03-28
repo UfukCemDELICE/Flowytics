@@ -86,14 +86,22 @@ async def sync_tenant(tenant_id: str, session: AsyncSession) -> dict:
         return {"status": "synced", "snapshots_created": len(snapshots)}
         
     except TokenExpiredError as e:
-        logger.error(f"QBO token expired for tenant {tenant_id}: {str(e)}")
+        logger.error(
+            "QBO token expired during sync",
+            extra={"tenant_id": tenant_id, "error_type": "token_expired", "provider": "quickbooks"},
+            exc_info=True,
+        )
         integration.sync_status = "disconnected"
         integration.error_message = str(e)
         await session.commit()
         raise
 
     except IntegrationError as e:
-        logger.error(f"Sync failed for tenant {tenant_id}: {str(e)}")
+        logger.error(
+            "Sync failed for tenant",
+            extra={"tenant_id": tenant_id, "error_type": "integration_error", "provider": "quickbooks"},
+            exc_info=True,
+        )
         integration.sync_status = "error"
         integration.error_message = str(e)
         await session.commit()

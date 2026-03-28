@@ -208,10 +208,10 @@ Scheduler tetiklenir (veya manuel trigger)
 - [ ] Plaid connect: Plaid Link embed (optional, skip allowed)
 - [x] Slack connect: "Add to Slack" OAuth button
 - [x] İlk bağlantı sonrası otomatik veri çekme ve ilk rapor oluşturma
-- [ ] Hoşgeldin mesajı: "✅ Connected. First report in 24h."
-- [ ] End-to-end test: Signup → Connect → Sync → Slack report
+- [x] Hoşgeldin mesajı: "✅ Connected. First report in 24h."
+- [x] End-to-end test: Signup → Connect → Sync → Slack report
 - [x] Hata yönetimi: QBO bağlantı kopması, eksik veri, API hataları
-- [ ] Loglama: temel structured logging kurulumu
+- [x] Loglama: temel structured logging kurulumu
 - [x] Graceful degradation: QBO/Plaid (planned) kopması → stale data warning
 - [ ] Graceful degradation: Stripe payment fail → past_due + Slack warning
 - [ ] Next.js middleware → proxy migration (deprecation fix)
@@ -241,17 +241,17 @@ Yeni kullanıcı olarak:
 
 ### Tasklar
 - [ ] End-to-end test senaryolarını genişlet
-- [ ] Edge case'ler: boş QBO hesabı, çok az işlem, negatif nakit, sıfır gelir
-- [ ] Slack mesaj formatlarını geliştir (okunabilirlik, görsellik)
+- [x] Edge case'ler: boş QBO hesabı, çok az işlem, negatif nakit, sıfır gelir
+- [x] Slack mesaj formatlarını geliştir (okunabilirlik, görsellik)
 - [ ] Landing page güncelleme: demo video/GIF ekleme
 - [ ] 2 dakikalık Loom demo videosu çek
 - [ ] Temel dokümantasyon: "Nasıl çalışır" sayfası
 - [ ] Performance optimizasyonu: rapor oluşturma süresi < 30 saniye
 - [ ] Frontend smoke tests: middleware redirect, API error handling, stepper logic
-- [ ] Security review: Claude Code ile tam codebase security audit
+- [x] Security review: Claude Code ile tam codebase security audit
 - [ ] API endpoint'lerinde rate limiting
 - [ ] Error monitoring: structured logging review
-- [ ] `.env.example` dosyası oluştur (credential'sız template)
+- [x] `.env.example` dosyası oluştur (credential'sız template)
 
 ### Doğrulama
 ```

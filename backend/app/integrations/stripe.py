@@ -20,11 +20,27 @@ async def create_checkout_session(
     cancel_url: str,
 ) -> str:
     """Create a Stripe Checkout session and return its URL."""
+    _setup_stripe()
+    
     price_id = _PRICE_IDS.get(tier)
+    
+    # Auto-provision a test price on the fly if using the dummy 'price_pro_monthly' string
+    if price_id == "price_pro_monthly":
+        prices = stripe.Price.list(active=True, limit=1)
+        if prices.data:
+            price_id = prices.data[0].id
+        else:
+            product = stripe.Product.create(name="Flowytics Startup Plan")
+            price = stripe.Price.create(
+                product=product.id,
+                unit_amount=15000, # $150
+                currency="usd",
+                recurring={"interval": "month"}
+            )
+            price_id = price.id
+
     if not price_id:
         raise HTTPException(status_code=400, detail=f"Unknown tier: {tier}")
-
-    _setup_stripe()
     session = stripe.checkout.Session.create(
         mode="subscription",
         line_items=[{"price": price_id, "quantity": 1}],

@@ -57,6 +57,8 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
                     "duration_ms": duration_ms,
                 },
             )
+            with open("response_debug.log", "a") as f:
+                f.write(f"MIDDLEWARE: {request.method} {request.url.path} -> {response.status_code}\n")
 
         return response
 

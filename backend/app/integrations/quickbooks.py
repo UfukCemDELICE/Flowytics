@@ -43,9 +43,9 @@ def get_auth_client() -> AuthClient:
     )
 
 def generate_auth_url(state: str) -> str:
+    from intuitlib.enums import Scopes
     auth_client = get_auth_client()
-    # Scopes: com.intuit.quickbooks.accounting
-    return auth_client.get_authorization_url(["com.intuit.quickbooks.accounting"], state_token=state)
+    return auth_client.get_authorization_url([Scopes.ACCOUNTING], state_token=state)
 
 async def handle_callback(code: str, realm_id: str, tenant_id: str, session: AsyncSession) -> Integration:
     auth_client = get_auth_client()

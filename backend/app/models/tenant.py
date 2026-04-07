@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 from sqlmodel import SQLModel, Field
 
 class Tenant(SQLModel, table=True):
     __tablename__ = "tenants"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     clerk_org_id: str = Field(unique=True, index=True)
     name: str
     stage: str = Field(default="pre_seed")  # CHECK: pre_seed, seed, series_a, series_b
@@ -25,7 +25,7 @@ class TenantCreate(SQLModel):
     name: str
 
 class TenantRead(SQLModel):
-    id: str
+    id: UUID
     name: str
     stage: str
     currency: str

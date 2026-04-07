@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 from sqlmodel import SQLModel, Field
 
 class Integration(SQLModel, table=True):
     __tablename__ = "integrations"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    tenant_id: UUID = Field(foreign_key="tenants.id", index=True)
     provider: str  # CHECK: codat, plaid
     provider_connection_id: str
     credentials_encrypted: str | None = Field(default=None)
@@ -17,13 +17,13 @@ class Integration(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class IntegrationCreate(SQLModel):
-    tenant_id: str
+    tenant_id: UUID
     provider: str
     provider_connection_id: str
 
 class IntegrationRead(SQLModel):
-    id: str
-    tenant_id: str
+    id: UUID
+    tenant_id: UUID
     provider: str
     platform_name: str | None
     sync_status: str

@@ -41,9 +41,9 @@ async def sync_tenant(tenant_id: str, session: AsyncSession) -> dict:
     
     try:
         # Pull reports from QBO
-        pl_data = await get_profit_and_loss(realm_id, start_date_str, end_date_str, session)
-        bs_data = await get_balance_sheet(realm_id, start_date_str, end_date_str, session)
-        cf_data = await get_cash_flow(realm_id, start_date_str, end_date_str, session)
+        pl_data = await get_profit_and_loss(realm_id, start_date_str, end_date_str, str(tenant_id), session)
+        bs_data = await get_balance_sheet(realm_id, start_date_str, end_date_str, str(tenant_id), session)
+        cf_data = await get_cash_flow(realm_id, start_date_str, end_date_str, str(tenant_id), session)
         
         # Save snapshots
         snapshots = [

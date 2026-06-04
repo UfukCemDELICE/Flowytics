@@ -142,10 +142,11 @@ class TokenExpiredError(IntegrationError):
     """Raised when QBO OAuth tokens have expired and cannot be refreshed."""
     pass
 
-async def get_qbo_client(realm_id: str, session: AsyncSession) -> QuickBooks:
+async def get_qbo_client(realm_id: str, tenant_id: str, session: AsyncSession) -> QuickBooks:
     stmt = select(Integration).where(
         Integration.provider_connection_id == realm_id,
-        Integration.provider == "quickbooks"
+        Integration.provider == "quickbooks",
+        Integration.tenant_id == tenant_id
     )
     result = await session.execute(stmt)
     integration = result.scalar_one_or_none()
@@ -168,9 +169,8 @@ async def get_qbo_client(realm_id: str, session: AsyncSession) -> QuickBooks:
     except Exception as e:
         raise IntegrationError(f"Failed to initialize QuickBooks client: {str(e)}")
 
-async def _fetch_report(realm_id: str, report_name: str, start_date: str, end_date: str, session: AsyncSession) -> dict:
-    """Shared helper to fetch a QBO report with proper error classification."""
-    qb = await get_qbo_client(realm_id, session)
+async def _fetch_report(realm_id: str, report_name: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
+    qb = await get_qbo_client(realm_id, tenant_id, session)
     try:
         report = qb.get_report(report_name, qs={"start_date": start_date, "end_date": end_date})
         return report
@@ -183,14 +183,12 @@ async def _fetch_report(realm_id: str, report_name: str, start_date: str, end_da
         raise IntegrationError(f"QuickBooks {report_name} request failed: {e.message}") from e
 
 
-async def get_profit_and_loss(realm_id: str, start_date: str, end_date: str, session: AsyncSession) -> dict:
-    return await _fetch_report(realm_id, "ProfitAndLoss", start_date, end_date, session)
+async def get_profit_and_loss(realm_id: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
+    return await _fetch_report(realm_id, "ProfitAndLoss", start_date, end_date, tenant_id, session)
 
+async def get_balance_sheet(realm_id: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
+    return await _fetch_report(realm_id, "BalanceSheet", start_date, end_date, tenant_id, session)
 
-async def get_balance_sheet(realm_id: str, start_date: str, end_date: str, session: AsyncSession) -> dict:
-    return await _fetch_report(realm_id, "BalanceSheet", start_date, end_date, session)
-
-
-async def get_cash_flow(realm_id: str, start_date: str, end_date: str, session: AsyncSession) -> dict:
-    return await _fetch_report(realm_id, "CashFlow", start_date, end_date, session)
+async def get_cash_flow(realm_id: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
+    return await _fetch_report(realm_id, "CashFlow", start_date, end_date, tenant_id, session)
 

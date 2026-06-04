@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from backend.app.utils import utc_now
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
-
+from sqlalchemy import delete
 from backend.app.models.integration import Integration
 from backend.app.models.financial_snapshot import FinancialSnapshot
 from backend.app.integrations.quickbooks import (
@@ -77,6 +77,12 @@ async def sync_tenant(tenant_id: str, session: AsyncSession) -> dict:
         ]
         
         for snap in snapshots:
+            delete_stmt = delete(FinancialSnapshot).where(
+                FinancialSnapshot.tenant_id == tenant_id,
+                FinancialSnapshot.data_type == snap.data_type,
+                FinancialSnapshot.snapshot_date == snap.snapshot_date,
+            )
+            await session.execute(delete_stmt)
             session.add(snap)
             
         # Update integration status

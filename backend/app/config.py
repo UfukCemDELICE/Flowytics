@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Security
     FERNET_KEY: str = ""         # 32-byte base64-encoded key for Fernet encryption
     FRONTEND_URL: str = "http://localhost:3000"  # For CORS and redirect URLs
-
+    SLACK_REDIRECT_URI: str = "http://localhost:8000/api/v1/slack/oauth_redirect"
     # Anthropic
     ANTHROPIC_API_KEY: str = ""
 

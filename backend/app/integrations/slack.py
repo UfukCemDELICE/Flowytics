@@ -197,7 +197,7 @@ class SlackClient:
                         "💡 *What to do next:*\n"
                         "• Ask me: _\"What's my current burn rate?\"_\n"
                         "• Ask me: _\"What if I cut cloud costs by 30%?\"_\n"
-                        "• Review your <http://localhost:3000/dashboard|Flowytics Dashboard>"
+                        f"• Review your <{settings.FRONTEND_URL}/dashboard|Flowytics Dashboard>"
                     ),
                 },
             },
@@ -395,7 +395,7 @@ class SlackClient:
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "🔄 Sync Now", "emoji": True},
-                    "url": "http://localhost:3000/dashboard",
+                    "url": f"{settings.FRONTEND_URL}/dashboard",
                     "action_id": "sync_now_cta",
                 },
             },

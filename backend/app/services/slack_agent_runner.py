@@ -1,3 +1,4 @@
+from backend.app.config import settings
 import logging
 import uuid
 import re
@@ -44,7 +45,7 @@ async def _check_qbo_data_freshness(tenant_id: str, session) -> tuple[str | None
 
     if integration.sync_status == "disconnected":
         return (
-            "🔌 Your QuickBooks connection has expired. Please reconnect via the Flowytics dashboard: http://localhost:3000/onboarding/accounting",
+            f"🔌 Your QuickBooks connection has expired. Please reconnect via the Flowytics dashboard: {settings.FRONTEND_URL}/onboarding/accounting",
             True,
         )
 
@@ -153,7 +154,7 @@ async def process_slack_message(event: dict):
             error_blocks = client.format_error_block(
                 title="Cannot Process Request",
                 message=warning_msg,
-                cta="<http://localhost:3000/onboarding/accounting|Connect QuickBooks>",
+                cta=f"<{settings.FRONTEND_URL}/onboarding/accounting|Connect QuickBooks>",
             )
             await client.send_reply(channel, thread_ts, warning_msg, blocks=error_blocks)
             agent_run.is_successful = False
@@ -212,7 +213,7 @@ async def process_slack_message(event: dict):
             error_blocks = client.format_error_block(
                 title="QuickBooks Connection Problem",
                 message=f"*Details:* {str(e)}",
-                cta="<http://localhost:3000/onboarding/accounting|Reconnect QuickBooks>",
+                cta=f"<{settings.FRONTEND_URL}/onboarding/accounting|Reconnect QuickBooks>",
             )
             error_text = f"⚠️ QuickBooks connection error: {str(e)}"
             await client.send_reply(channel, thread_ts, error_text, blocks=error_blocks)

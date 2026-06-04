@@ -49,9 +49,8 @@ async def slack_install(user: dict = Depends(get_current_user)) -> dict:
     state = jwt.encode({"org_id": user["org_id"]}, settings.CLERK_SECRET_KEY[:32], algorithm="HS256")
     
     scopes = "chat:write,app_mentions:read,channels:history,groups:history,im:history"
-    redirect_uri = os.getenv("SLACK_REDIRECT_URI", "http://localhost:8000/api/v1/slack/oauth_redirect")
-    url = f"https://slack.com/oauth/v2/authorize?client_id={client_id}&scope={scopes}&state={state}&redirect_uri={redirect_uri}"
-    return {"auth_url": url}
+    redirect_uri = settings.SLACK_REDIRECT_URI
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard")
 
 @router.get("/oauth_redirect", response_class=RedirectResponse)
 async def oauth_redirect(
@@ -76,7 +75,7 @@ async def oauth_redirect(
             client_id=settings.SLACK_CLIENT_ID,
             client_secret=settings.SLACK_CLIENT_SECRET,
             code=code,
-            redirect_uri=os.getenv("SLACK_REDIRECT_URI", "http://localhost:8000/api/v1/slack/oauth_redirect")
+            redirect_uri = settings.SLACK_REDIRECT_URI 
         )
         team_id = response.get("team", {}).get("id")
         

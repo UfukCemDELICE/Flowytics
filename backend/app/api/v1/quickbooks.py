@@ -76,7 +76,7 @@ async def oauth_callback(
         await quickbooks.handle_callback(code, realmId, tenant.id, session)
         # Fire background sync — user sees dashboard instantly, data populates async
         asyncio.create_task(_background_first_sync(tenant.id))
-        return RedirectResponse(url="http://localhost:3000/dashboard")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard")
     except quickbooks.IntegrationError as e:
         logger.error(f"QBO callback upstream error: {e}")
         raise HTTPException(status_code=502, detail={"error": "upstream_error", "message": "Could not connect to QuickBooks. Please try again."})

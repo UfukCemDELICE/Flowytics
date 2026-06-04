@@ -1,13 +1,16 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
-from uuid import uuid4
+from uuid import uuid4, UUID
 from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlmodel import SQLModel, Field, JSON
+
+from backend.app.utils import utc_now
 
 class AgentRun(SQLModel, table=True):
     __tablename__ = "agent_runs"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    id: UUID = Field(default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True))
+    tenant_id: UUID = Field(sa_column=Column(PG_UUID(as_uuid=True), nullable=False, index=True))
     trigger_type: str  # CHECK: scheduled, slack_message, webhook, manual
     trigger_payload: dict | None = Field(default=None, sa_column=Column(JSON))
     query: str | None = Field(default=None)
@@ -23,5 +26,5 @@ class AgentRun(SQLModel, table=True):
     output_result: dict | None = Field(default=None, sa_column=Column(JSON))
     error: str | None = Field(default=None)
     error_message: str | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=utc_now)
 

@@ -21,15 +21,6 @@ class Settings(BaseSettings):
     # Clerk
     CLERK_SECRET_KEY: str = ""
 
-    # Codat
-    CODAT_API_KEY: str = ""
-    CODAT_BASE_URL: str = "https://api.codat.io"
-
-    # Plaid
-    PLAID_CLIENT_ID: str = ""
-    PLAID_SECRET: str = ""
-    PLAID_ENV: str = "sandbox"
-
     # QuickBooks Online
     QB_CLIENT_ID: str = ""
     QB_CLIENT_SECRET: str = ""

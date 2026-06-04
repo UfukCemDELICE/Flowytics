@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from sqlmodel import select
+from backend.app.utils import utc_now
 
 from backend.app.database import _get_engine
 from backend.app.models.tenant import Tenant
@@ -58,7 +59,11 @@ async def run_proactive_alerts():
                     continue
 
                 if integration.last_synced_at:
-                    age = datetime.now(timezone.utc) - integration.last_synced_at
+                    last_synced = integration.last_synced_at
+                    if last_synced.tzinfo is not None:
+                        age = datetime.now(timezone.utc) - last_synced
+                    else:
+                        age = utc_now() - last_synced
                     if age > STALE_DATA_THRESHOLD:
                         channel = tenant.slack_channel_id or "#general"
                         days_ago = age.days

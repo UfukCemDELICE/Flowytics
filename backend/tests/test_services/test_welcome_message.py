@@ -12,6 +12,7 @@ Covers:
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import patch, AsyncMock, MagicMock
+from uuid import UUID
 
 from backend.app.models.tenant import Tenant
 from backend.app.models.integration import Integration
@@ -20,6 +21,8 @@ from backend.app.services.onboarding_welcome import (
     _build_welcome_blocks,
     _check_and_send,
 )
+
+TEST_UUID = UUID("00000000-0000-0000-0000-000000000001")
 
 
 # ── Block Kit content quality ───────────────────────────────────
@@ -90,7 +93,7 @@ async def test_deferred_when_tenant_not_found():
     mock_result.scalar_one_or_none.return_value = None
     session.execute.return_value = mock_result
 
-    result = await _check_and_send("nonexistent-org", session)
+    result = await _check_and_send("00000000-0000-0000-0000-000000000000", session)
     assert result is False
 
 
@@ -98,12 +101,12 @@ async def test_deferred_when_tenant_not_found():
 async def test_idempotent_when_already_completed():
     """If onboarding_completed is True, don't send again."""
     tenant = Tenant(
-        id="t-1", clerk_org_id="org-1", name="Test Co",
+        id=TEST_UUID, clerk_org_id="org-1", name="Test Co",
         slack_team_id="T123", onboarding_completed=True,
     )
     session = _mock_session_with(tenant)
 
-    result = await _check_and_send("org-1", session)
+    result = await _check_and_send(TEST_UUID, session)
     assert result is False
 
 
@@ -111,12 +114,12 @@ async def test_idempotent_when_already_completed():
 async def test_deferred_when_slack_not_connected():
     """If Slack is not connected, defer the welcome."""
     tenant = Tenant(
-        id="t-1", clerk_org_id="org-1", name="Test Co",
+        id=TEST_UUID, clerk_org_id="org-1", name="Test Co",
         slack_team_id=None, onboarding_completed=False,
     )
     session = _mock_session_with(tenant)
 
-    result = await _check_and_send("org-1", session)
+    result = await _check_and_send(TEST_UUID, session)
     assert result is False
 
 
@@ -124,13 +127,13 @@ async def test_deferred_when_slack_not_connected():
 async def test_deferred_when_qbo_not_synced():
     """If QBO integration has never synced, defer the welcome."""
     tenant = Tenant(
-        id="t-1", clerk_org_id="org-1", name="Test Co",
+        id=TEST_UUID, clerk_org_id="org-1", name="Test Co",
         slack_team_id="T123", onboarding_completed=False,
     )
     # Integration exists but last_synced_at is None → query returns None
     session = _mock_session_with(tenant, integration=None)
 
-    result = await _check_and_send("org-1", session)
+    result = await _check_and_send(TEST_UUID, session)
     assert result is False
 
 
@@ -140,12 +143,12 @@ async def test_deferred_when_qbo_not_synced():
 async def test_welcome_sent_when_all_milestones_met():
     """When Slack + QBO are both ready, welcome should be sent and onboarding_completed set."""
     tenant = Tenant(
-        id="t-1", clerk_org_id="org-1", name="Acme Inc",
+        id=TEST_UUID, clerk_org_id="org-1", name="Acme Inc",
         slack_team_id="T123", slack_channel_id="#general",
         onboarding_completed=False,
     )
     integration = Integration(
-        id="int-1", tenant_id="t-1", provider="quickbooks",
+        id="int-1", tenant_id=TEST_UUID, provider="quickbooks",
         provider_connection_id="realm-1", sync_status="active",
         last_synced_at=datetime.now(timezone.utc),
     )
@@ -156,7 +159,7 @@ async def test_welcome_sent_when_all_milestones_met():
         mock_instance.send_message = AsyncMock(return_value=True)
         MockClient.return_value = mock_instance
 
-        result = await _check_and_send("org-1", session)
+        result = await _check_and_send(TEST_UUID, session)
 
         assert result is True
         assert tenant.onboarding_completed is True
@@ -173,12 +176,12 @@ async def test_welcome_sent_when_all_milestones_met():
 async def test_welcome_uses_general_when_no_channel_configured():
     """Falls back to #general when slack_channel_id is None."""
     tenant = Tenant(
-        id="t-1", clerk_org_id="org-1", name="Test Co",
+        id=TEST_UUID, clerk_org_id="org-1", name="Test Co",
         slack_team_id="T123", slack_channel_id=None,
         onboarding_completed=False,
     )
     integration = Integration(
-        id="int-1", tenant_id="t-1", provider="quickbooks",
+        id="int-1", tenant_id=TEST_UUID, provider="quickbooks",
         provider_connection_id="realm-1", sync_status="active",
         last_synced_at=datetime.now(timezone.utc),
     )
@@ -189,7 +192,7 @@ async def test_welcome_uses_general_when_no_channel_configured():
         mock_instance.send_message = AsyncMock(return_value=True)
         MockClient.return_value = mock_instance
 
-        result = await _check_and_send("org-1", session)
+        result = await _check_and_send(TEST_UUID, session)
 
         assert result is True
         call_args = mock_instance.send_message.call_args
@@ -200,11 +203,11 @@ async def test_welcome_uses_general_when_no_channel_configured():
 async def test_welcome_not_marked_complete_on_delivery_failure():
     """If Slack API fails, onboarding_completed stays False for retry."""
     tenant = Tenant(
-        id="t-1", clerk_org_id="org-1", name="Test Co",
+        id=TEST_UUID, clerk_org_id="org-1", name="Test Co",
         slack_team_id="T123", onboarding_completed=False,
     )
     integration = Integration(
-        id="int-1", tenant_id="t-1", provider="quickbooks",
+        id="int-1", tenant_id=TEST_UUID, provider="quickbooks",
         provider_connection_id="realm-1", sync_status="active",
         last_synced_at=datetime.now(timezone.utc),
     )
@@ -215,7 +218,7 @@ async def test_welcome_not_marked_complete_on_delivery_failure():
         mock_instance.send_message = AsyncMock(return_value=False)  # Delivery failed
         MockClient.return_value = mock_instance
 
-        result = await _check_and_send("org-1", session)
+        result = await _check_and_send(TEST_UUID, session)
 
         assert result is False
         assert tenant.onboarding_completed is False  # Not marked, will retry
@@ -238,8 +241,8 @@ async def test_qbo_first_sync_triggers_welcome():
             mock_sync.return_value = {"status": "synced", "snapshots_created": 3}
             with patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
                 mock_welcome.return_value = True
-                await _background_first_sync("org-123")
-                mock_welcome.assert_awaited_once_with("org-123", mock_session)
+                await _background_first_sync(TEST_UUID)
+                mock_welcome.assert_awaited_once_with(TEST_UUID, mock_session)
 
 
 @pytest.mark.asyncio
@@ -255,12 +258,11 @@ async def test_slack_oauth_triggers_welcome():
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)):
         with patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
             mock_welcome.return_value = True
-            await _background_welcome_check("org-456")
-            mock_welcome.assert_awaited_once_with("org-456", mock_session)
+            await _background_welcome_check(TEST_UUID)
+            mock_welcome.assert_awaited_once_with(TEST_UUID, mock_session)
 
 
 @pytest.mark.asyncio
 async def test_welcome_import():
     """Smoke test: all imports work, no circular dependencies."""
-    from backend.app.services.onboarding_welcome import send_welcome_message_if_ready
     assert callable(send_welcome_message_if_ready)

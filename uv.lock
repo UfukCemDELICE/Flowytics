@@ -730,7 +730,6 @@ dependencies = [
     { name = "langchain-core" },
     { name = "langgraph" },
     { name = "orjson" },
-    { name = "plaid-python" },
     { name = "polars" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
@@ -767,7 +766,6 @@ requires-dist = [
     { name = "langchain-core", specifier = ">=1.2.14" },
     { name = "langgraph", specifier = ">=1.0.9" },
     { name = "orjson", specifier = ">=3.11.7" },
-    { name = "plaid-python", specifier = ">=29.0.0" },
     { name = "polars", specifier = ">=1.38.1" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
     { name = "pyjwt", specifier = ">=2.11.0" },
@@ -1517,15 +1515,6 @@ wheels = [
 ]
 
 [[package]]
-name = "nulltype"
-version = "2.3.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2f/ce/92289851364b7f816a839c8064aac06c01f3a3ecf33ab04adf9d0a0ab66a/nulltype-2.3.1.zip", hash = "sha256:64aa3cb2ab5e904d1b37175b9b922bea268c13f9ce32e3d373313150ab5ef272", size = 20119, upload-time = "2018-06-03T22:01:01.45Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/0f/47dde1a3cceac9858da0bfb92d2279bf5f993ed075b72983e92efc297db3/nulltype-2.3.1-py2.py3-none-any.whl", hash = "sha256:16ae565745118e37e0558441f5821c76351d8c3a789640b5bca277cf65b2271b", size = 11054, upload-time = "2018-06-03T22:01:04.03Z" },
-]
-
-[[package]]
 name = "oauthlib"
 version = "3.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1643,17 +1632,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/fa/36/e27608899f9b8d4df
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ef/3c/2c197d226f9ea224a9ab8d197933f9da0ae0aac5b6e0f884e2b8d9c8e9f7/pathspec-1.0.4-py3-none-any.whl", hash = "sha256:fb6ae2fd4e7c921a165808a552060e722767cfa526f99ca5156ed2ce45a5c723", size = 55206, upload-time = "2026-01-27T03:59:45.137Z" },
 ]
-
-[[package]]
-name = "plaid-python"
-version = "38.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "nulltype" },
-    { name = "python-dateutil" },
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/30/8245993e457040004b5e670b302e2bbd7c20255168f5a530c6ea8206cae5/plaid_python-38.3.0.tar.gz", hash = "sha256:74da09d73652775201e0333653c7a09678cad1ced9877bed5106ff1057a05840", size = 1173133, upload-time = "2026-02-19T00:44:30.737Z" }
 
 [[package]]
 name = "pluggy"

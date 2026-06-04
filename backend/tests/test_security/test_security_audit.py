@@ -10,7 +10,7 @@ Tests:
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
@@ -60,6 +60,10 @@ class TestAuthEnforcement:
         resp = client.post("/api/v1/quickbooks/sync")
         assert resp.status_code == 401
 
+    def test_qbo_disconnect_requires_auth(self, client):
+        resp = client.delete("/api/v1/quickbooks/disconnect")
+        assert resp.status_code == 401
+
     def test_stripe_checkout_requires_auth(self, client):
         resp = client.post("/api/v1/stripe/create-checkout-session", json={
             "tier": "pro_monthly", "success_url": "http://x", "cancel_url": "http://y"
@@ -68,6 +72,10 @@ class TestAuthEnforcement:
 
     def test_slack_install_requires_auth(self, client):
         resp = client.get("/api/v1/slack/install")
+        assert resp.status_code == 401
+
+    def test_slack_disconnect_requires_auth(self, client):
+        resp = client.delete("/api/v1/slack/disconnect")
         assert resp.status_code == 401
 
     def test_trigger_report_requires_auth(self, client):

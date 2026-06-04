@@ -8,13 +8,13 @@
               ┌──────────────────────┐
               │  Flowytics (Agentic  │
               │     CFO System)      │
-              └──────┬───────┬───────┘
-                     │       │
-              QuickBooks API   Plaid (Planned)
-                     │       │
-              ┌──────┘       └──────┐
-        Accounting Software    Bank Accounts
-        (QBO, Xero)           (Chase, SVB, Mercury)
+               └──────┬───────────────┘
+                      │
+               QuickBooks API
+                      │
+               ┌──────┘
+         Accounting Software
+         (QBO, Xero)
 ```
 
 Flowytics is a read-only intelligence layer. It never writes back to accounting software or banks.
@@ -52,7 +52,6 @@ Single backend process. No microservices.
 External APIs:
   → Anthropic Claude API (LLM reasoning)
   → QuickBooks API (accounting data)
-  → Plaid API (banking data, planned)
   → Slack API (messaging)
   → Stripe API (billing)
   → Clerk API (auth verification)
@@ -63,7 +62,7 @@ External APIs:
 ### Flow 1 — Onboarding
 ```
 Clerk Sign Up → Stripe Payment Setup (14-day trial) →
-QuickBooks OAuth (connect QBO) → Plaid Link (connect bank, planned) →
+QuickBooks OAuth (connect QBO) →
 Slack OAuth (add bot) → Initial data sync triggered →
 First CFO report sent to Slack within 24h
 ```
@@ -73,7 +72,6 @@ Details: see frontend.md
 ```
 APScheduler triggers at 6am UTC for each active tenant
   → QuickBooks: Query Reports via API → P&L, Balance Sheet, Transactions
-  → Plaid: POST /transactions/sync → new transactions since last cursor
   → Raw JSONB saved to financial_snapshots table
   → At 7am: deterministic tools run (burn rate, runway, anomalies)
   → If critical threshold breached → immediate Slack alert
@@ -114,15 +112,6 @@ Direct integration via standard OAuth and QBO API.
 **Sync:** Webhooks or daily scheduled pulls.
 **Onboarding:** Direct QBO OAuth flow in the frontend wizard/dashboard.
 
-### Plaid — Banking Data (Optional in MVP)
-
-**MVP endpoints:**
-| Endpoint | Returns | Used for |
-|----------|---------|----------|
-| `GET /accounts/balance/get` | Real-time balances | Accurate cash position |
-| `POST /transactions/sync` | Incremental feed | Cross-validation with Quickbooks |
-
-**Onboarding:** Plaid Link UI. Skippable — "Connect bank for real-time cash tracking."
 
 ### Slack — Primary Interface
 
@@ -161,7 +150,6 @@ The system must never fully stop. When dependencies fail, degrade gracefully:
 | Failure | Impact | System Response |
 |---------|--------|----------------|
 | QuickBooks connection lost | No fresh accounting data | Continue with last `financial_snapshots`. All Slack messages show "⚠️ Using data from {date}. Reconnect via dashboard." |
-| Plaid connection lost | No real-time bank balance | Fall back to QBO's bank data. |
 | Stripe payment failed | Revenue at risk | `past_due` status. Service continues 14 days (Stripe smart retry). Slack warning sent. After 14 days → `cancelled`, final notice, agent stops. |
 | Slack bot removed | Can't deliver insights | Agent completes analysis, saves to DB. Delivery marked failed. Pending reports queued. Delivered when Slack reconnected. |
 | Claude API down | No LLM reasoning | Retry once. If fails: deliver tool results only (numbers without narrative). "AI analysis temporarily unavailable." |
@@ -195,7 +183,6 @@ Managed PostgreSQL. Direct connection via asyncpg (not REST API). Connection poo
 | Supabase (Pro) | $25 |
 | Claude API (~10 tenants) | $50-150 |
 | QuickBooks API | $0 (Free) |
-| Plaid (Development) | $0 |
 | Clerk (Free tier) | $0 |
 | Stripe (per txn) | 2.9% + 30¢ |
 | **Total** | **~$100-310/mo** |
@@ -210,9 +197,9 @@ Revenue at 10 paying tenants: $1,500/mo. Positive unit economics from day one.
 | Multi-agent system | Single agent handles all tools. Multi-agent adds orchestration overhead with zero value at this scale. |
 | Neuro-symbolic AI (PyReason) | Python 3.12 incompatible, months of R&D, solo founder can't afford. |
 | DSPy for prompts | Zero experience, no training data. Plain text prompts for MVP. |
-| Direct QBO API | Decided to adopt direct integration and drop Codat after unresponsive experience. |
+| Direct QBO API | Decided to adopt direct integration after unresponsive experience with aggregators. |
 | Web dashboard | Allowed strictly for onboarding and integration/billing management. No analytics reports (Slack-first). |
-| Türkiye market | Different accounting system, no Plaid/Codat, low payment capacity. |
+| Türkiye market | Different accounting system, low payment capacity. |
 | Fractional CFO B2B2C | $46-97M funded competitors, Botkeeper's $90M failure. |
 | LangSmith observability | Paid service. Console logging + agent_runs table sufficient for MVP. |
 | CI/CD post-MVP | Too risky. GitHub Actions CI set up in Week 1. Deploy via manual trigger per sprint. |

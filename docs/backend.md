@@ -165,7 +165,7 @@ from fastapi import HTTPException
 
 # Integration errors — graceful degradation
 class IntegrationError(Exception):
-    """QuickBooks/Plaid API failure."""
+    """QuickBooks API failure."""
     pass
 
 @app.exception_handler(IntegrationError)
@@ -179,9 +179,9 @@ async def integration_error_handler(request, exc):
 **Error categories:**
 | Source | Strategy |
 |--------|----------|
-| QuickBooks/Plaid 401 | Auto-refresh token → retry once |
-| QuickBooks/Plaid 429 | Exponential backoff, use cached data |
-| QuickBooks/Plaid 500 | Use last snapshot with "stale" warning |
+| QuickBooks 401 | Auto-refresh token → retry once |
+| QuickBooks 429 | Exponential backoff, use cached data |
+| QuickBooks 500 | Use last snapshot with "stale" warning |
 | Claude timeout | Retry once, then return tool-only results |
 | Claude rate limit | Queue, notify user of delay |
 | LLM number mismatch | Use tool numbers, log discrepancy |
@@ -259,9 +259,6 @@ class Settings(BaseSettings):
     QBO_CLIENT_ID: str
     QBO_CLIENT_SECRET: str
     QBO_ENVIRONMENT: str = "sandbox"
-    PLAID_CLIENT_ID: str = ""
-    PLAID_SECRET: str = ""
-    PLAID_ENV: str = "sandbox"
     STRIPE_SECRET_KEY: str
     STRIPE_WEBHOOK_SECRET: str
     SLACK_BOT_TOKEN: str

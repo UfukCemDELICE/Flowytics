@@ -58,7 +58,6 @@ def test_fundraising_high_growth_rate():
 
 def test_monthly_report_execution():
     """Test monthly report aggregation returns a populated dict/model."""
-    from backend.app.tools.monthly_report import generate_monthly_report_data
     from backend.app.tools.schemas import MonthlyFinancial, FinancialSummary
     
     summary = FinancialSummary(

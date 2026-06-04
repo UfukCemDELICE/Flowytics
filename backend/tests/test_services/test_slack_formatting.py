@@ -7,14 +7,12 @@ required visual elements (headers, footers, emoji indicators).
 """
 
 from decimal import Decimal
-import pytest
 
 from backend.app.integrations.slack import (
     SlackClient,
     _fmt_currency,
     _fmt_pct,
     _split_into_sections,
-    _BRAND_FOOTER,
 )
 
 

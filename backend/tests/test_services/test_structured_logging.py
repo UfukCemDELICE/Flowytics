@@ -12,7 +12,6 @@ Covers:
 
 import json
 import logging
-import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 

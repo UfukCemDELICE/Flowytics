@@ -27,7 +27,7 @@ AI-powered managerial accounting intelligence layer for pre-seed and seed-stage 
 - **Scheduler:** APScheduler (in-process, cron-style jobs)
 - **Auth:** Clerk (JWT verification)
 - **Payments:** Stripe
-- **Integrations:** QuickBooks Online API (accounting, direct integration), Plaid (banking, planned for later), Slack Bot API
+- **Integrations:** QuickBooks Online API (accounting, direct integration), Slack Bot API
 
 ### Frontend
 - **Framework:** Next.js (App Router, TypeScript strict)
@@ -56,7 +56,7 @@ flowytics/
 │   │   ├── api/v1/               # API routes (see backend.md)
 │   │   ├── agent/                # LangGraph CFO agent (see agents.md)
 │   │   ├── tools/                # Deterministic financial tools (see agents.md)
-│   │   ├── integrations/         # QuickBooks, Plaid (planned), Slack, Stripe clients
+│   │   ├── integrations/         # QuickBooks, Slack, Stripe clients
 │   │   ├── models/               # SQLModel DB models + Pydantic schemas
 │   │   ├── services/             # Business logic, sync, scheduler
 │   │   └── prompts/              # Plain text LLM prompt files
@@ -188,10 +188,6 @@ QBO_CLIENT_ID=
 QBO_CLIENT_SECRET=
 QBO_ENVIRONMENT=sandbox
 
-# Plaid (Planned)
-PLAID_CLIENT_ID=
-PLAID_SECRET=
-PLAID_ENV=sandbox
 
 # Stripe
 STRIPE_SECRET_KEY=
@@ -213,7 +209,7 @@ SLACK_APP_TOKEN=
 6. **NEVER query DB without tenant scope.** Every query filters by `tenant_id`.
 7. **NEVER expose secrets.** pydantic-settings + .env only.
 8. **Tools are the source of truth for numbers.** If LLM contradicts a tool, the tool wins.
-9. **QuickBooks API is the accounting abstraction.** Codat was dropped. Plaid is planned for later.
+9. **QuickBooks API is the accounting abstraction.**
 10. **Slack is the product.** Web UI exists only for onboarding and integration management (/dashboard).
 11. **Graceful degradation always.** When a dependency fails, degrade — don't crash. See `docs/architecture.md` → Graceful Degradation Policy.
 
@@ -226,7 +222,7 @@ SLACK_APP_TOKEN=
 | `docs/backend.md` | Python conventions, FastAPI patterns, data processing | Writing backend code |
 | `docs/agents.md` | LangGraph agent, all tool specs, model routing | Working on agent or tools |
 | `docs/db.md` | Full schema, RLS, indexes, data principles | Database work |
-| `docs/frontend.md` | Onboarding flow, Clerk/Stripe/Codat/Plaid embeds | Frontend work |
+| `docs/frontend.md` | Onboarding flow, Clerk/Stripe embeds | Frontend work |
 | `docs/testing.md` | Test strategy, coverage goals, sprint reports | Writing tests, sprint reviews |
 
 ## When Compacting

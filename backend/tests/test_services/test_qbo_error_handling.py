@@ -8,7 +8,6 @@ Tests for Sprint 6 MUSTs:
 """
 import pytest
 from datetime import datetime, timezone, timedelta
-from decimal import Decimal
 from unittest.mock import patch, AsyncMock, MagicMock
 
 from backend.app.integrations.quickbooks import (
@@ -19,7 +18,6 @@ from backend.app.integrations.quickbooks import (
 from backend.app.models.integration import Integration
 from backend.app.services.slack_agent_runner import (
     _check_qbo_data_freshness,
-    STALE_DATA_THRESHOLD,
 )
 
 
@@ -59,7 +57,9 @@ async def test_auto_refresh_raises_token_expired_on_missing_credentials():
 @pytest.mark.asyncio
 async def test_auto_refresh_marks_disconnected_on_refresh_failure():
     """When the Intuit refresh call fails, integration must become 'disconnected'."""
-    import json, base64, hashlib
+    import json
+    import base64
+    import hashlib
     from cryptography.fernet import Fernet
 
     # Build valid encrypted tokens with an old timestamp to trigger refresh path

@@ -117,7 +117,7 @@ async def auto_refresh_token(integration: Integration, session: AsyncSession) ->
         integration.error_message = f"Token refresh failed: {str(e)}"
         await session.commit()
         raise TokenExpiredError(
-            f"QuickBooks connection expired. Please reconnect via the dashboard."
+            "QuickBooks connection expired. Please reconnect via the dashboard."
         ) from e
     
     tokens.update({

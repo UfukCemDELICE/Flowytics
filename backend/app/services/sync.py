@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import logging
 from dateutil.relativedelta import relativedelta
+from backend.app.utils import utc_now
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -79,7 +80,7 @@ async def sync_tenant(tenant_id: str, session: AsyncSession) -> dict:
             session.add(snap)
             
         # Update integration status
-        integration.last_synced_at = datetime.now(timezone.utc)
+        integration.last_synced_at = utc_now()
         integration.sync_status = "active"
         
         await session.commit()

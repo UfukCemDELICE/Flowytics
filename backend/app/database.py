@@ -14,7 +14,16 @@ def _get_engine():
     global _engine, _async_session
     if _engine is None:
         settings = get_settings()
-        _engine = create_async_engine(settings.DATABASE_URL, echo=False, pool_size=5)
+        connect_args = {}
+        if "asyncpg" in settings.DATABASE_URL:
+            # Disable prepared statement caching for asyncpg compatibility with PgBouncer
+            connect_args["statement_cache_size"] = 0
+        _engine = create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,
+            pool_size=5,
+            connect_args=connect_args,
+        )
         _async_session = sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
     return _engine, _async_session
 

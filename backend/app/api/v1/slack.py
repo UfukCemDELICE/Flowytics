@@ -1,3 +1,4 @@
+import os
 import logging
 import jwt
 import asyncio
@@ -19,16 +20,16 @@ router = APIRouter(prefix="/slack", tags=["slack"])
 logger = logging.getLogger(__name__)
 
 
-async def _background_welcome_check(org_id: str):
+async def _background_welcome_check(tenant_id: str):
     """Background task: check if welcome message should be sent after Slack connect."""
     from backend.app.database import _get_engine
     from backend.app.services.onboarding_welcome import send_welcome_message_if_ready
     _, session_factory = _get_engine()
     async with session_factory() as bg_session:
         try:
-            await send_welcome_message_if_ready(org_id, bg_session)
+            await send_welcome_message_if_ready(tenant_id, bg_session)
         except Exception as e:
-            logger.error(f"Welcome check failed after Slack connect for org {org_id}: {e}")
+            logger.error(f"Welcome check failed after Slack connect for tenant {tenant_id}: {e}")
 
 
 
@@ -48,7 +49,7 @@ async def slack_install(user: dict = Depends(get_current_user)) -> dict:
     state = jwt.encode({"org_id": user["org_id"]}, settings.CLERK_SECRET_KEY[:32], algorithm="HS256")
     
     scopes = "chat:write,app_mentions:read,channels:history,groups:history,im:history"
-    redirect_uri = "http://localhost:8000/api/v1/slack/oauth_redirect"
+    redirect_uri = os.getenv("SLACK_REDIRECT_URI", "http://localhost:8000/api/v1/slack/oauth_redirect")
     url = f"https://slack.com/oauth/v2/authorize?client_id={client_id}&scope={scopes}&state={state}&redirect_uri={redirect_uri}"
     return {"auth_url": url}
 
@@ -74,7 +75,8 @@ async def oauth_redirect(
         response = await client.oauth_v2_access(
             client_id=settings.SLACK_CLIENT_ID,
             client_secret=settings.SLACK_CLIENT_SECRET,
-            code=code
+            code=code,
+            redirect_uri=os.getenv("SLACK_REDIRECT_URI", "http://localhost:8000/api/v1/slack/oauth_redirect")
         )
         team_id = response.get("team", {}).get("id")
         
@@ -89,7 +91,7 @@ async def oauth_redirect(
             session.add(tenant)
             await session.commit()
             # Check if all onboarding milestones are met → send welcome
-            asyncio.create_task(_background_welcome_check(tenant.clerk_org_id))
+            asyncio.create_task(_background_welcome_check(str(tenant.id)))
             
         return RedirectResponse(url="http://localhost:3000/dashboard")
         
@@ -128,4 +130,22 @@ async def trigger_monthly_report(
     # Run heavily in background so the request doesn't timeout hitting Claude
     asyncio.create_task(run_monthly_reports(tenant_id))
     return {"status": "dispatched", "message": f"Monthly report requested for Tenant ID {tenant_id}"}
+
+@router.delete("/disconnect")
+async def disconnect_slack(
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Disconnect Slack by clearing slack_team_id and slack_channel_id."""
+    stmt = select(Tenant).where(Tenant.clerk_org_id == user["org_id"])
+    res = await session.execute(stmt)
+    tenant = res.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+        
+    tenant.slack_team_id = None
+    tenant.slack_channel_id = None
+    session.add(tenant)
+    await session.commit()
+    return {"status": "disconnected"}
 

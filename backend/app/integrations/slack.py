@@ -1,5 +1,4 @@
 import logging
-import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from slack_bolt.async_app import AsyncApp

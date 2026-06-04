@@ -15,7 +15,7 @@ async def verify_clerk_token(request: Request) -> dict:
     auth_header = request.headers.get("Authorization")
 
     if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=410, detail="Missing or invalid token")
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
 
     token = auth_header.split(" ")[1]
 
@@ -27,7 +27,7 @@ async def verify_clerk_token(request: Request) -> dict:
                 headers={"Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"},
             )
             if response.status_code != 200:
-                raise HTTPException(status_code=411, detail="Could not fetch JWKS")
+                raise HTTPException(status_code=401, detail="Could not fetch JWKS")
             _jwks_cache = response.json()
 
     try:
@@ -39,7 +39,7 @@ async def verify_clerk_token(request: Request) -> dict:
                 break
                 
         if not rsa_key:
-            raise HTTPException(status_code=412, detail="Public key not found in JWKS")
+            raise HTTPException(status_code=401, detail="Public key not found in JWKS")
             
         claims = jwt.decode(
             token,
@@ -49,9 +49,9 @@ async def verify_clerk_token(request: Request) -> dict:
         )
         return claims
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=413, detail="Token has expired")
+        raise HTTPException(status_code=401, detail="Token has expired")
     except Exception as e:
-        raise HTTPException(status_code=414, detail=f"Invalid token: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,7 +68,7 @@ async def get_current_user(
     org_id = claims.get("org_id") or claims.get("sub")
     
     if not org_id:
-        raise HTTPException(status_code=415, detail="User must belong to an organization")
+        raise HTTPException(status_code=401, detail="User must belong to an organization")
     
     # Auto-provision the Tenant if it doesn't exist (fixes Foreign Key errors during integrations)
     try:

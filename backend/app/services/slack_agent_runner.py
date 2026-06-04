@@ -3,6 +3,7 @@ import uuid
 import re
 from datetime import datetime, timezone, timedelta
 from sqlmodel import select
+from backend.app.utils import utc_now
 
 from backend.app.database import _get_engine
 from backend.app.models.tenant import Tenant
@@ -53,7 +54,11 @@ async def _check_qbo_data_freshness(tenant_id: str, session) -> tuple[str | None
             True,
         )
 
-    age = datetime.now(timezone.utc) - integration.last_synced_at
+    last_synced = integration.last_synced_at
+    if last_synced.tzinfo is not None:
+        age = datetime.now(timezone.utc) - last_synced
+    else:
+        age = utc_now() - last_synced
     if age > STALE_DATA_THRESHOLD:
         days_ago = age.days
         hours_ago = int(age.total_seconds() // 3600)

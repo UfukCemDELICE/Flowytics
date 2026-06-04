@@ -8,6 +8,8 @@ Single supervisor agent with deterministic LangGraph tools. Not multi-agent.
 
 **Why LangGraph tools (not raw Python):** LangGraph tools ARE pure Python functions — decorated with `@tool` so the agent can discover and call them. The agent (Claude) decides which tools to call and in what order based on the user's question. The function itself does deterministic math. No LLM inside the function.
 
+**Integration Scope:** The agent operates exclusively on financial data snapshots ingested from QuickBooks Online. All tools are designed for QBO structures, with no banking or other third-party aggregator dependencies.
+
 ## Graph Structure
 
 ```

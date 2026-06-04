@@ -388,7 +388,7 @@ export default async function Home() {
               </span>
             </summary>
             <div className="text-text-dim px-6 pb-6 pt-0 leading-relaxed">
-              Absolutely. We use bank-level 256-bit encryption and partner with Plaid and Codat for read-only access. We never have the ability to move money or change records.
+              Absolutely. We use bank-level 256-bit encryption and partner with QuickBooks Online for read-only access. We never have the ability to move money or change records.
             </div>
           </details>
           <details className="group bg-white border border-surface-border rounded-lg shadow-sm">

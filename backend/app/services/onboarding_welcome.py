@@ -10,6 +10,7 @@ on the Tenant model, guaranteeing exactly-once delivery.
 """
 
 import logging
+from uuid import UUID
 from sqlmodel import select
 
 from backend.app.database import _get_engine
@@ -20,13 +21,13 @@ from backend.app.integrations.slack import SlackClient
 logger = logging.getLogger(__name__)
 
 
-async def send_welcome_message_if_ready(tenant_id: str, session=None) -> bool:
+async def send_welcome_message_if_ready(tenant_id: str | UUID, session=None) -> bool:
     """
     Check if the tenant has completed QBO + Slack onboarding, and if so,
     send a one-time welcome message. Returns True if the message was sent.
 
     Args:
-        tenant_id: The tenant's Clerk org ID or internal ID.
+        tenant_id: The tenant's internal UUID (str or UUID object).
         session: Optional async DB session. If None, creates one internally.
 
     Returns:
@@ -48,13 +49,20 @@ async def send_welcome_message_if_ready(tenant_id: str, session=None) -> bool:
             await session.__aexit__(None, None, None)
 
 
-async def _check_and_send(tenant_id: str, session) -> bool:
+async def _check_and_send(tenant_id: str | UUID, session) -> bool:
     """Core logic: verify milestones met, send welcome, mark complete."""
 
-    # 1. Load tenant — try both clerk_org_id and internal id
-    stmt = select(Tenant).where(
-        (Tenant.clerk_org_id == tenant_id) | (Tenant.id == tenant_id)
-    )
+    # 1. Load tenant — using internal UUID only
+    tenant_uuid: UUID | str
+    if isinstance(tenant_id, UUID):
+        tenant_uuid = tenant_id
+    else:
+        try:
+            tenant_uuid = UUID(str(tenant_id))
+        except ValueError:
+            tenant_uuid = tenant_id
+
+    stmt = select(Tenant).where(Tenant.id == tenant_uuid)
     result = await session.execute(stmt)
     tenant = result.scalar_one_or_none()
 
@@ -76,7 +84,7 @@ async def _check_and_send(tenant_id: str, session) -> bool:
     integ_stmt = select(Integration).where(
         Integration.tenant_id == tenant.id,
         Integration.provider == "quickbooks",
-        Integration.last_synced_at.isnot(None),
+        Integration.last_synced_at != None,
     )
     integ_result = await session.execute(integ_stmt)
     integration = integ_result.scalar_one_or_none()
@@ -89,10 +97,7 @@ async def _check_and_send(tenant_id: str, session) -> bool:
     channel = tenant.slack_channel_id or "#general"
     client = SlackClient()
     blocks = _build_welcome_blocks(tenant.name)
-    fallback_text = (
-        "✅ Flowytics is connected! Your AI CFO is ready. "
-        "Your first financial report will arrive within 24 hours."
-    )
+    fallback_text = "✅ Flowytics is connected! Your AI CFO is ready. Your first financial report will arrive within 24 hours."
 
     success = await client.send_message(channel, fallback_text, blocks=blocks)
 
@@ -126,10 +131,7 @@ def _build_welcome_blocks(company_name: str) -> list:
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": (
-                    f"Hey *{company_name}* team! 👋\n\n"
-                    "Your AI CFO is ready to go. Here's what happens next:"
-                ),
+                "text": f"Hey *{company_name}* team! 👋\n\nYour AI CFO is ready to go. Here's what happens next:",
             },
         },
         {
@@ -160,12 +162,7 @@ def _build_welcome_blocks(company_name: str) -> list:
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": (
-                    "*Try me now!* Mention me in any channel and ask:\n"
-                    "• _\"What's my burn rate?\"_\n"
-                    "• _\"How long is my runway?\"_\n"
-                    "• _\"What if I hire 2 engineers?\"_"
-                ),
+                "text": '*Try me now!* Mention me in any channel and ask:\n• _"What\'s my burn rate?"_\n• _"How long is my runway?"_\n• _"What if I hire 2 engineers?"_',
             },
         },
         {
@@ -173,10 +170,7 @@ def _build_welcome_blocks(company_name: str) -> list:
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": (
-                        "🤖 _Flowytics AI CFO — $150/mo of financial intelligence, "
-                        "powered by your real QuickBooks data._"
-                    ),
+                    "text": "🤖 _Flowytics AI CFO — $150/mo of financial intelligence, powered by your real QuickBooks data._",
                 },
             ],
         },

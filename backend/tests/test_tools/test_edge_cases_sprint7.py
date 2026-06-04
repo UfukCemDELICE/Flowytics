@@ -9,7 +9,6 @@ that have already exhausted their cash, and corrupted data from QBO API quirks.
 from datetime import date
 from decimal import Decimal
 
-import pytest
 
 from backend.app.tools.burn_rate import calculate_burn_rate
 from backend.app.tools.runway import calculate_runway

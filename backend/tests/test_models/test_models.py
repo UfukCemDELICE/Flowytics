@@ -28,7 +28,7 @@ def test_tenant_read_excludes_stripe():
 def test_integration_defaults():
     """Integration has correct default sync_status."""
     from backend.app.models.integration import Integration
-    i = Integration(tenant_id="tid", provider="codat", provider_connection_id="cid")
+    i = Integration(tenant_id="tid", provider="quickbooks", provider_connection_id="cid")
     assert i.sync_status == "pending"
 
 def test_integration_read_excludes_credentials():
@@ -41,7 +41,7 @@ def test_financial_snapshot_accepts_dict():
     from backend.app.models.financial_snapshot import FinancialSnapshot
     fs = FinancialSnapshot(
         tenant_id="tid", snapshot_date=date(2026, 3, 1),
-        source="codat", data_type="profit_loss",
+        source="quickbooks", data_type="profit_loss",
         raw_data={"revenue": 50000, "expenses": 80000}
     )
     assert fs.raw_data["revenue"] == 50000

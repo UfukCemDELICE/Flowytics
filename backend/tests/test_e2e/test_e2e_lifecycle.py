@@ -14,7 +14,6 @@ Phases:
   6. SLACK REPORT:  User @mentions bot → agent invoked → CFO response returned
 """
 
-import json
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import patch, AsyncMock, MagicMock
@@ -22,11 +21,9 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
-from backend.app.auth import get_current_user
 from backend.app.database import get_session
 from backend.app.models.tenant import Tenant
 from backend.app.models.integration import Integration
-from backend.app.models.financial_snapshot import FinancialSnapshot
 
 
 # ────────────────────────────────────────────────────────────────
@@ -509,7 +506,6 @@ def test_e2e_http_health_and_stripe_webhook():
     HTTP-level integration test via TestClient:
     Health check → Stripe webhook creates subscription.
     """
-    from backend.app.database import get_session
 
     mock_session = AsyncMock()
     mock_session.add = MagicMock()

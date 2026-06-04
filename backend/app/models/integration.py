@@ -1,12 +1,16 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID, uuid4
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlmodel import SQLModel, Field
+
+from backend.app.utils import utc_now
 
 class Integration(SQLModel, table=True):
     __tablename__ = "integrations"
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    tenant_id: UUID = Field(foreign_key="tenants.id", index=True)
-    provider: str  # CHECK: codat, plaid
+    id: UUID = Field(default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True))
+    tenant_id: UUID = Field(sa_column=Column(PG_UUID(as_uuid=True), nullable=False, index=True))
+    provider: str  # CHECK: quickbooks
     provider_connection_id: str
     credentials_encrypted: str | None = Field(default=None)
     platform_name: str | None = Field(default=None)
@@ -14,7 +18,7 @@ class Integration(SQLModel, table=True):
     last_synced_at: datetime | None = Field(default=None)
     sync_cursor: str | None = Field(default=None)
     error_message: str | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=utc_now)
 
 class IntegrationCreate(SQLModel):
     tenant_id: UUID

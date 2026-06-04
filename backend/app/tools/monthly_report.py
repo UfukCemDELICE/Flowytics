@@ -1,7 +1,5 @@
-from typing import Dict, Any, List
 from langchain_core.tools import tool
 from pydantic import BaseModel
-from decimal import Decimal
 
 from backend.app.tools.schemas import (
     FinancialSummary, 

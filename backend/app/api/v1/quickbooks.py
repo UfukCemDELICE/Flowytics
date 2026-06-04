@@ -1,9 +1,11 @@
 import asyncio
 import logging
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 import jwt
 
 from backend.app.auth import get_current_user
@@ -11,24 +13,26 @@ from backend.app.database import get_session
 from backend.app.integrations import quickbooks
 from backend.app.services.sync import sync_tenant
 from backend.app.config import get_settings
+from backend.app.models.tenant import Tenant
+from backend.app.models.integration import Integration
 
 router = APIRouter(prefix="/quickbooks", tags=["quickbooks"])
 logger = logging.getLogger(__name__)
 
 
-async def _background_first_sync(org_id: str):
+async def _background_first_sync(tenant_id: UUID):
     """Background task: pull QBO data immediately after OAuth connect."""
     from backend.app.database import _get_engine
     from backend.app.services.onboarding_welcome import send_welcome_message_if_ready
     _, session_factory = _get_engine()
     async with session_factory() as bg_session:
         try:
-            result = await sync_tenant(org_id, bg_session)
-            logger.info(f"Auto first-sync completed for org {org_id}: {result}")
+            result = await sync_tenant(tenant_id, bg_session)
+            logger.info(f"Auto first-sync completed for tenant {tenant_id}: {result}")
             # Check if all onboarding milestones are met → send welcome
-            await send_welcome_message_if_ready(org_id, bg_session)
+            await send_welcome_message_if_ready(tenant_id, bg_session)
         except Exception as e:
-            logger.error(f"Auto first-sync failed for org {org_id}: {e}")
+            logger.error(f"Auto first-sync failed for tenant {tenant_id}: {e}")
 
 
 @router.get("/auth")
@@ -62,14 +66,22 @@ async def oauth_callback(
         )
 
     try:
-        await quickbooks.handle_callback(code, realmId, org_id, session)
+        # Resolve Clerk org_id to Tenant.id (UUID)
+        stmt = select(Tenant).where(Tenant.clerk_org_id == org_id)
+        res = await session.execute(stmt)
+        tenant = res.scalar_one_or_none()
+        if not tenant:
+            raise ValueError(f"No tenant found for clerk org ID: {org_id}")
+
+        await quickbooks.handle_callback(code, realmId, tenant.id, session)
         # Fire background sync — user sees dashboard instantly, data populates async
-        asyncio.create_task(_background_first_sync(org_id))
+        asyncio.create_task(_background_first_sync(tenant.id))
         return RedirectResponse(url="http://localhost:3000/dashboard")
     except quickbooks.IntegrationError as e:
         logger.error(f"QBO callback upstream error: {e}")
         raise HTTPException(status_code=502, detail={"error": "upstream_error", "message": "Could not connect to QuickBooks. Please try again."})
-    except Exception as e:
+    except Exception:
+        logger.exception("QuickBooks OAuth callback failed with unexpected error")
         raise HTTPException(status_code=500, detail={"error": "internal_error", "message": "QuickBooks OAuth exchange failed."})
 
 @router.post("/sync")
@@ -79,7 +91,14 @@ async def sync_quickbooks_data(
 ):
     """Trigger a manual sync of QuickBooks data for the current tenant."""
     try:
-        result = await sync_tenant(user["org_id"], session)
+        # Resolve user["org_id"] to Tenant database UUID
+        stmt = select(Tenant).where(Tenant.clerk_org_id == user["org_id"])
+        res = await session.execute(stmt)
+        tenant = res.scalar_one_or_none()
+        if not tenant:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+
+        result = await sync_tenant(tenant.id, session)
         return result
     except quickbooks.IntegrationError as e:
         logger.error(f"QBO sync integration error for org {user['org_id']}: {e}")
@@ -87,3 +106,27 @@ async def sync_quickbooks_data(
     except Exception as e:
         logger.error(f"QBO sync internal error for org {user['org_id']}: {e}")
         raise HTTPException(status_code=500, detail={"error": "internal_error", "message": "An unexpected error occurred during sync."})
+
+@router.delete("/disconnect")
+async def disconnect_quickbooks(
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Disconnect QuickBooks Online by deleting the integration record."""
+    stmt = select(Tenant).where(Tenant.clerk_org_id == user["org_id"])
+    res = await session.execute(stmt)
+    tenant = res.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+        
+    integ_stmt = select(Integration).where(
+        Integration.tenant_id == tenant.id,
+        Integration.provider == "quickbooks"
+    )
+    res = await session.execute(integ_stmt)
+    integration = res.scalar_one_or_none()
+    if integration:
+        await session.delete(integration)
+        await session.commit()
+        return {"status": "disconnected"}
+    return {"status": "not_connected"}

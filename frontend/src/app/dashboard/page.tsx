@@ -7,10 +7,32 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 export default async function DashboardPage() {
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
 
   if (!userId) {
     redirect("/sign-in");
+  }
+
+  const token = await getToken();
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  
+  let quickbooksConnected = false;
+  let slackConnected = false;
+  
+  try {
+    const res = await fetch(`${apiUrl}/api/v1/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      next: { revalidate: 0 },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      quickbooksConnected = !!data.quickbooks_connected;
+      slackConnected = !!data.slack_connected;
+    }
+  } catch (err) {
+    console.error("Failed to fetch user integration status:", err);
   }
 
   return (
@@ -54,12 +76,19 @@ export default async function DashboardPage() {
                   <p className="text-sm text-text-dim mb-4">
                     Connect your accounting data securely. Flowytics only uses read-only access to analyze your financials.
                   </p>
-                  <QuickBooksConnectButton />
+                  <QuickBooksConnectButton connected={quickbooksConnected} />
                 </div>
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 border border-gray-200">
-                  <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                  <span className="text-xs font-medium text-text-dim">Not Connected</span>
-                </div>
+                {quickbooksConnected ? (
+                  <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 border border-green-200">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span className="text-xs font-medium text-green-700">Connected</span>
+                  </div>
+                ) : (
+                  <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200">
+                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                    <span className="text-xs font-medium text-red-700">Not Connected</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -75,12 +104,19 @@ export default async function DashboardPage() {
                   <p className="text-sm text-text-dim mb-4">
                     Get automated insights, burn rate alerts, and monthly CFO briefings delivered straight to your team&apos;s Slack.
                   </p>
-                  <SlackConnectButton />
+                  <SlackConnectButton connected={slackConnected} />
                 </div>
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 border border-gray-200">
-                  <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                  <span className="text-xs font-medium text-text-dim">Not Connected</span>
-                </div>
+                {slackConnected ? (
+                  <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 border border-green-200">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span className="text-xs font-medium text-green-700">Connected</span>
+                  </div>
+                ) : (
+                  <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200">
+                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                    <span className="text-xs font-medium text-red-700">Not Connected</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

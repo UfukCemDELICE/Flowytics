@@ -39,7 +39,6 @@ from starlette.responses import Response
 
 @router.get("/install")
 async def slack_install(user: dict = Depends(get_current_user)):
-    """Generate the 'Add to Slack' URL and redirect."""
     settings = get_settings()
     client_id = settings.SLACK_CLIENT_ID
     state = jwt.encode({"org_id": user["org_id"]}, settings.CLERK_SECRET_KEY[:32], algorithm="HS256")
@@ -52,7 +51,7 @@ async def slack_install(user: dict = Depends(get_current_user)):
         f"&redirect_uri={redirect_uri}"
         f"&state={state}"
     )
-    return RedirectResponse(url=slack_url)
+    return {"auth_url": slack_url}
 
 @router.get("/oauth_redirect", response_class=RedirectResponse)
 async def oauth_redirect(

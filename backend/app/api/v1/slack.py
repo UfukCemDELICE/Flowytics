@@ -31,8 +31,6 @@ async def _background_welcome_check(tenant_id: str):
         except Exception as e:
             logger.error(f"Welcome check failed after Slack connect for tenant {tenant_id}: {e}")
 
-
-
 # Bolt Adapter
 slack_handler = AsyncSlackRequestHandler(slack_app)
 
@@ -40,17 +38,21 @@ from slack_sdk.errors import SlackApiError
 from starlette.responses import Response
 
 @router.get("/install")
-async def slack_install(user: dict = Depends(get_current_user)) -> dict:
+async def slack_install(user: dict = Depends(get_current_user)):
     """Generate the 'Add to Slack' URL and redirect."""
     settings = get_settings()
     client_id = settings.SLACK_CLIENT_ID
-    
-    # We pass org_id in state to identify tenant in callback
     state = jwt.encode({"org_id": user["org_id"]}, settings.CLERK_SECRET_KEY[:32], algorithm="HS256")
-    
     scopes = "chat:write,app_mentions:read,channels:history,groups:history,im:history"
     redirect_uri = settings.SLACK_REDIRECT_URI
-    return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard")
+    slack_url = (
+        f"https://slack.com/oauth/v2/authorize"
+        f"?client_id={client_id}"
+        f"&scope={scopes}"
+        f"&redirect_uri={redirect_uri}"
+        f"&state={state}"
+    )
+    return RedirectResponse(url=slack_url)
 
 @router.get("/oauth_redirect", response_class=RedirectResponse)
 async def oauth_redirect(
@@ -92,7 +94,7 @@ async def oauth_redirect(
             # Check if all onboarding milestones are met → send welcome
             asyncio.create_task(_background_welcome_check(str(tenant.id)))
             
-        return RedirectResponse(url="http://localhost:3000/dashboard")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard")
         
     except SlackApiError as e:
         logger.error(f"Slack OAuth API error: {e.response['error']}")

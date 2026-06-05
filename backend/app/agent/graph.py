@@ -41,7 +41,7 @@ def call_model(state: AgentState) -> dict:
     model_name = state.get("recommended_model", "claude-sonnet-4-6")
     summary = state.get("financial_summary")
     
-    llm = ChatAnthropic(model=model_name, temperature=0.0)
+    llm = ChatAnthropic(model=model_name)
     llm_with_tools = llm.bind_tools(active_tools)
     
     # 1. Base Core Prompt

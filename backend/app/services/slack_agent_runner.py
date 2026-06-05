@@ -130,6 +130,32 @@ async def process_slack_message(event: dict):
         await session.commit()
         await session.refresh(agent_run)
 
+        # Fetch QBO snapshots and build financial summary
+        pl_stmt = select(FinancialSnapshot).where(
+            FinancialSnapshot.tenant_id == tenant.id,
+            FinancialSnapshot.data_type == "profit_loss"
+        ).order_by(FinancialSnapshot.snapshot_date.desc()).limit(1)
+        pl_snap = (await session.execute(pl_stmt)).scalar_one_or_none()
+
+        bs_stmt = select(FinancialSnapshot).where(
+            FinancialSnapshot.tenant_id == tenant.id,
+            FinancialSnapshot.data_type == "balance_sheet"
+        ).order_by(FinancialSnapshot.snapshot_date.desc()).limit(1)
+        bs_snap = (await session.execute(bs_stmt)).scalar_one_or_none()
+
+        if not pl_snap or not bs_snap:
+            error_msg = "Please connect your QuickBooks account first."
+            error_blocks = client.format_error_block(
+                title="Connection Required",
+                message=error_msg,
+                cta=f"<{settings.FRONTEND_URL}/onboarding/accounting|Connect QuickBooks>",
+            )
+            await client.send_reply(channel, thread_ts, error_msg, blocks=error_blocks)
+            agent_run.is_successful = False
+            agent_run.error_message = error_msg
+            await session.commit()
+            return
+
         warning_msg, should_block = await _check_qbo_data_freshness(tenant.id, session)
 
         if should_block:
@@ -147,26 +173,18 @@ async def process_slack_message(event: dict):
         import time
         start_time = time.perf_counter()
         try:
-            # Fetch QBO snapshots and build financial summary
-            pl_stmt = select(FinancialSnapshot).where(
-                FinancialSnapshot.tenant_id == tenant.id,
-                FinancialSnapshot.data_type == "profit_loss"
-            ).order_by(FinancialSnapshot.snapshot_date.desc()).limit(1)
-            pl_snap = (await session.execute(pl_stmt)).scalar_one_or_none()
+            # Fetch integration sync status
+            integration_stmt = select(Integration).where(
+                Integration.tenant_id == tenant.id,
+                Integration.provider == "quickbooks"
+            )
+            integration = (await session.execute(integration_stmt)).scalar_one_or_none()
 
-            bs_stmt = select(FinancialSnapshot).where(
-                FinancialSnapshot.tenant_id == tenant.id,
-                FinancialSnapshot.data_type == "balance_sheet"
-            ).order_by(FinancialSnapshot.snapshot_date.desc()).limit(1)
-            bs_snap = (await session.execute(bs_stmt)).scalar_one_or_none()
-
-            financial_summary = None
-            if pl_snap and bs_snap:
-                financial_summary = parse_financial_summary(
-                    pl_snap.raw_data,
-                    bs_snap.raw_data,
-                    pl_snap.period_end
-                )
+            financial_summary = parse_financial_summary(
+                pl_snap.raw_data,
+                bs_snap.raw_data,
+                pl_snap.period_end
+            )
 
             inputs = {
                 "messages": [("user", clean_text)],
@@ -187,6 +205,14 @@ async def process_slack_message(event: dict):
             model_used = result.get("recommended_model") or "claude-sonnet-4-6"
 
             final_message = result["messages"][-1].content
+
+            if integration and integration.sync_status == "error":
+                last_synced_str = "N/A"
+                if integration.last_synced_at:
+                    last_synced_str = integration.last_synced_at.strftime("%Y-%m-%d")
+                sync_warning = f"⚠️ QuickBooks sync is currently unavailable. Showing data from last successful sync on {last_synced_str}."
+                final_message = f"{sync_warning}\n\n{final_message}"
+                warning_msg = None
 
             response_blocks = []
 

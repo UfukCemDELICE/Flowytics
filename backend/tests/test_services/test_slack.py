@@ -160,3 +160,167 @@ async def test_slack_agent_run_logging():
     assert run.model_used == "claude-haiku-4-5-20251001"
     assert isinstance(run.duration_ms, int)
     assert run.duration_ms > 0
+
+
+@pytest.mark.asyncio
+async def test_slack_agent_runner_sync_error_warning():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    from datetime import datetime, timezone, date
+    from backend.app.models.tenant import Tenant
+    from backend.app.models.integration import Integration
+    from backend.app.models.financial_snapshot import FinancialSnapshot
+    from backend.app.services.slack_agent_runner import process_slack_message
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+    from langchain_core.messages import AIMessage
+
+    db = InMemoryDB()
+
+    tenant = Tenant(
+        id="t-err-001",
+        clerk_org_id="err_org",
+        name="Error Co",
+        subscription_status="active",
+        slack_team_id="T_ERR_TEAM",
+    )
+    db.add(tenant)
+
+    integration = Integration(
+        id="int-err-001",
+        tenant_id="t-err-001",
+        provider="quickbooks",
+        provider_connection_id="realm-err",
+        sync_status="error",
+        last_synced_at=datetime(2026, 6, 6, 12, 0, 0, tzinfo=timezone.utc),
+    )
+    db.add(integration)
+
+    pl_snap = FinancialSnapshot(
+        tenant_id="t-err-001",
+        snapshot_date=date(2026, 6, 6),
+        source="quickbooks",
+        data_type="profit_loss",
+        raw_data={"Header": {"ReportName": "ProfitAndLoss"}, "Rows": {"Row": []}},
+        period_start=date(2026, 6, 6),
+        period_end=date(2026, 6, 6)
+    )
+    bs_snap = FinancialSnapshot(
+        tenant_id="t-err-001",
+        snapshot_date=date(2026, 6, 6),
+        source="quickbooks",
+        data_type="balance_sheet",
+        raw_data={"Header": {"ReportName": "BalanceSheet"}, "Rows": {"Row": []}},
+        period_start=date(2026, 6, 6),
+        period_end=date(2026, 6, 6)
+    )
+    db.add(pl_snap)
+    db.add(bs_snap)
+    await db.commit()
+
+    mock_msg = AIMessage(content="Your gross burn rate is $5,000.")
+    mock_agent_result = {
+        "messages": [mock_msg],
+        "recommended_model": "claude-haiku-4-5-20251001"
+    }
+
+    slack_event = {
+        "team": "T_ERR_TEAM",
+        "user": "U_ERR_USER",
+        "channel": "C_ERR_CHANNEL",
+        "text": "<@BOT> What is my burn rate?",
+        "ts": "1711648000.000001",
+        "thread_ts": "1711648000.000001",
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.services.slack_agent_runner._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.slack_agent_runner.agent_app.ainvoke", new_callable=AsyncMock) as mock_ainvoke, \
+         patch("backend.app.services.slack_agent_runner.SlackClient") as MockSlackClient:
+
+        mock_ainvoke.return_value = mock_agent_result
+
+        mock_slack = MagicMock()
+        mock_slack.send_reply = AsyncMock(return_value=True)
+        mock_slack.format_cfo_response_block = MagicMock(return_value=[{"type": "section", "text": {"type": "mrkdwn", "text": "stub"}}])
+        MockSlackClient.return_value = mock_slack
+
+        await process_slack_message(slack_event)
+
+        # Assertions
+        mock_slack.send_reply.assert_awaited_once()
+        reply_args = mock_slack.send_reply.call_args
+        reply_text = reply_args[1].get("text") or reply_args[0][2]
+        assert "QuickBooks sync is currently unavailable" in reply_text
+        assert "Showing data from last successful sync on 2026-06-06" in reply_text
+        assert "Your gross burn rate is $5,000" in reply_text
+
+
+@pytest.mark.asyncio
+async def test_slack_agent_runner_no_snapshots():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    from backend.app.models.tenant import Tenant
+    from backend.app.models.integration import Integration
+    from backend.app.services.slack_agent_runner import process_slack_message
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+
+    db = InMemoryDB()
+
+    tenant = Tenant(
+        id="t-nosnap-001",
+        clerk_org_id="nosnap_org",
+        name="No Snap Co",
+        subscription_status="active",
+        slack_team_id="T_NOSNAP_TEAM",
+    )
+    db.add(tenant)
+
+    # Let's say integration exists but is active/error but has NEVER synced (no snapshots)
+    integration = Integration(
+        id="int-nosnap-001",
+        tenant_id="t-nosnap-001",
+        provider="quickbooks",
+        provider_connection_id="realm-nosnap",
+        sync_status="active",
+        last_synced_at=None,
+    )
+    db.add(integration)
+    await db.commit()
+
+    slack_event = {
+        "team": "T_NOSNAP_TEAM",
+        "user": "U_NOSNAP_USER",
+        "channel": "C_NOSNAP_CHANNEL",
+        "text": "<@BOT> What is my burn rate?",
+        "ts": "1711648000.000001",
+        "thread_ts": "1711648000.000001",
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.services.slack_agent_runner._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.slack_agent_runner.agent_app.ainvoke", new_callable=AsyncMock) as mock_ainvoke, \
+         patch("backend.app.services.slack_agent_runner.SlackClient") as MockSlackClient:
+
+        mock_slack = MagicMock()
+        mock_slack.send_reply = AsyncMock(return_value=True)
+        mock_slack.format_error_block = MagicMock(return_value=[{"type": "section", "text": {"type": "mrkdwn", "text": "stub_error"}}])
+        MockSlackClient.return_value = mock_slack
+
+        await process_slack_message(slack_event)
+
+        # Assertions
+        mock_slack.send_reply.assert_awaited_once()
+        reply_args = mock_slack.send_reply.call_args
+        reply_text = reply_args[1].get("text") or reply_args[0][2]
+        assert "Please connect your QuickBooks account first." in reply_text
+        mock_ainvoke.assert_not_awaited()
+
+        # Check AgentRun
+        agent_runs = db.store.get("agent_runs", [])
+        assert len(agent_runs) == 1
+        assert agent_runs[0].is_successful is False
+        assert agent_runs[0].error_message == "Please connect your QuickBooks account first."

@@ -38,7 +38,7 @@ def load_prompt(filename: str) -> str:
 
 def call_model(state: AgentState) -> dict:
     messages = state["messages"]
-    model_name = state.get("recommended_model", "claude-sonnet-4-5-20250514")
+    model_name = state.get("recommended_model", "claude-sonnet-4-6")
     summary = state.get("financial_summary")
     
     llm = ChatAnthropic(model=model_name, temperature=0.0)

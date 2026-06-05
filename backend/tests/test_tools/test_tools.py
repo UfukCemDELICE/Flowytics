@@ -79,3 +79,95 @@ def test_qbo_parser_sandbox_values():
     assert monthly.total_expenses == Decimal("8558.31")
     assert monthly.net_income == Decimal("1642.46")
     assert monthly.total_revenue - monthly.total_expenses == monthly.net_income
+
+def test_qbo_parser_multi_month_values():
+    from datetime import date
+    from backend.app.tools.qbo_parser import parse_financial_summary
+
+    pl_data = {
+        "Columns": {
+            "Column": [
+                {"colTitle": "", "colType": "Account"},
+                {"colTitle": "Jan 2026", "colType": "String"},
+                {"colTitle": "Feb 2026", "colType": "String"},
+                {"colTitle": "Mar 2026", "colType": "String"},
+                {"colTitle": "Total", "colType": "String"}
+            ]
+        },
+        "Rows": {
+            "Row": [
+                {
+                    "group": "Income",
+                    "Summary": {"ColData": [{"value": "Total Income"}, {"value": "1000.00"}, {"value": "2000.00"}, {"value": "3000.00"}, {"value": "6000.00"}]}
+                },
+                {
+                    "group": "Expenses",
+                    "Summary": {"ColData": [{"value": "Total Expenses"}, {"value": "600.00"}, {"value": "1200.00"}, {"value": "1800.00"}, {"value": "3600.00"}]}
+                },
+                {
+                    "group": "NetIncome",
+                    "Summary": {"ColData": [{"value": "Net Income"}, {"value": "400.00"}, {"value": "800.00"}, {"value": "1200.00"}, {"value": "2400.00"}]}
+                }
+            ]
+        }
+    }
+    bs_data = {
+        "Columns": {
+            "Column": [
+                {"colTitle": "", "colType": "Account"},
+                {"colTitle": "Jan 2026", "colType": "String"},
+                {"colTitle": "Feb 2026", "colType": "String"},
+                {"colTitle": "Mar 2026", "colType": "String"},
+                {"colTitle": "Total", "colType": "String"}
+            ]
+        },
+        "Rows": {
+            "Row": [
+                {
+                    "group": "TotalAssets",
+                    "Rows": {
+                        "Row": [
+                            {
+                                "group": "CurrentAssets",
+                                "Rows": {
+                                    "Row": [
+                                        {
+                                            "group": "BankAccounts",
+                                            "Summary": {"ColData": [{"value": "Total Bank Accounts"}, {"value": "10000.00"}, {"value": "11000.00"}, {"value": "12000.00"}, {"value": "12000.00"}]}
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+
+    summary = parse_financial_summary(pl_data, bs_data, date(2026, 6, 5))
+    assert len(summary.monthly_financials) == 3
+    
+    # Check Jan 2026
+    jan = summary.monthly_financials[0]
+    assert jan.month_start == date(2026, 1, 1)
+    assert jan.total_revenue == Decimal("1000.00")
+    assert jan.total_expenses == Decimal("600.00")
+    assert jan.net_income == Decimal("400.00")
+
+    # Check Feb 2026
+    feb = summary.monthly_financials[1]
+    assert feb.month_start == date(2026, 2, 1)
+    assert feb.total_revenue == Decimal("2000.00")
+    assert feb.total_expenses == Decimal("1200.00")
+    assert feb.net_income == Decimal("800.00")
+
+    # Check Mar 2026
+    mar = summary.monthly_financials[2]
+    assert mar.month_start == date(2026, 3, 1)
+    assert mar.total_revenue == Decimal("3000.00")
+    assert mar.total_expenses == Decimal("1800.00")
+    assert mar.net_income == Decimal("1200.00")
+
+    # Check current cash balance
+    assert summary.current_cash_balance == Decimal("12000.00")

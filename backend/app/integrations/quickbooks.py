@@ -10,6 +10,7 @@ from quickbooks.exceptions import QuickbooksException
 
 from backend.app.config import get_settings
 from backend.app.models.integration import Integration
+from backend.app.models.tenant import Tenant
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -172,7 +173,11 @@ async def get_qbo_client(realm_id: str, tenant_id: str, session: AsyncSession) -
 async def _fetch_report(realm_id: str, report_name: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
     qb = await get_qbo_client(realm_id, tenant_id, session)
     try:
-        report = qb.get_report(report_name, qs={"start_date": start_date, "end_date": end_date})
+        report = qb.get_report(report_name, qs={
+            "start_date": start_date,
+            "end_date": end_date,
+            "summarize_column_by": "Month"
+        })
         return report
     except QuickbooksException as e:
         error_code = getattr(e, 'error_code', None) or getattr(e, 'status_code', None)
@@ -183,12 +188,38 @@ async def _fetch_report(realm_id: str, report_name: str, start_date: str, end_da
         raise IntegrationError(f"QuickBooks {report_name} request failed: {e.message}") from e
 
 
+async def _get_report_date_range(tenant_id: str, session: AsyncSession) -> tuple[str, str]:
+    from uuid import UUID
+    try:
+        t_id = UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id
+    except ValueError:
+        t_id = tenant_id
+
+    stmt = select(Tenant).where(Tenant.id == t_id)
+    result = await session.execute(stmt)
+    tenant = result.scalar_one_or_none()
+
+    today = datetime.now(timezone.utc).date()
+    two_years_ago = today - timedelta(days=2 * 365)
+
+    if tenant and tenant.created_at:
+        tenant_created = tenant.created_at.date() if hasattr(tenant.created_at, "date") else tenant.created_at
+        start_date = min(tenant_created, two_years_ago)
+    else:
+        start_date = two_years_ago
+
+    return start_date.isoformat(), today.isoformat()
+
+
 async def get_profit_and_loss(realm_id: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
-    return await _fetch_report(realm_id, "ProfitAndLoss", start_date, end_date, tenant_id, session)
+    start_date_str, end_date_str = await _get_report_date_range(tenant_id, session)
+    return await _fetch_report(realm_id, "ProfitAndLoss", start_date_str, end_date_str, tenant_id, session)
 
 async def get_balance_sheet(realm_id: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
-    return await _fetch_report(realm_id, "BalanceSheet", start_date, end_date, tenant_id, session)
+    start_date_str, end_date_str = await _get_report_date_range(tenant_id, session)
+    return await _fetch_report(realm_id, "BalanceSheet", start_date_str, end_date_str, tenant_id, session)
 
 async def get_cash_flow(realm_id: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
-    return await _fetch_report(realm_id, "CashFlow", start_date, end_date, tenant_id, session)
+    start_date_str, end_date_str = await _get_report_date_range(tenant_id, session)
+    return await _fetch_report(realm_id, "CashFlow", start_date_str, end_date_str, tenant_id, session)
 

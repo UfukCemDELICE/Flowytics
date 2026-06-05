@@ -7,6 +7,7 @@ from sqlmodel import select
 from sqlalchemy import delete
 from backend.app.models.integration import Integration
 from backend.app.models.financial_snapshot import FinancialSnapshot
+from backend.app.models.tenant import Tenant
 from backend.app.integrations.quickbooks import (
     get_profit_and_loss,
     get_balance_sheet,
@@ -32,10 +33,26 @@ async def sync_tenant(tenant_id: str, session: AsyncSession) -> dict:
         
     realm_id = integration.provider_connection_id
     
-    # Use last 12 months as the default period
+    # Fetch tenant to calculate dynamic start_date
+    from uuid import UUID
+    try:
+        t_id = UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id
+    except ValueError:
+        t_id = tenant_id
+
+    tenant_stmt = select(Tenant).where(Tenant.id == t_id)
+    tenant_res = await session.execute(tenant_stmt)
+    tenant = tenant_res.scalar_one_or_none()
+
     today = datetime.now(timezone.utc).date()
-    start_date = today - relativedelta(months=12)
-    
+    two_years_ago = today - relativedelta(years=2)
+
+    if tenant and tenant.created_at:
+        tenant_created = tenant.created_at.date() if hasattr(tenant.created_at, "date") else tenant.created_at
+        start_date = min(tenant_created, two_years_ago)
+    else:
+        start_date = two_years_ago
+
     start_date_str = start_date.isoformat()
     end_date_str = today.isoformat()
     

@@ -31,6 +31,55 @@ async def _background_welcome_check(tenant_id: str):
         except Exception as e:
             logger.error(f"Welcome check failed after Slack connect for tenant {tenant_id}: {e}")
 
+
+async def _background_member_joined_handler(team_id: str):
+    """Background task to handle bot joining a channel: find tenant and check welcome message."""
+    from backend.app.database import _get_engine
+    from backend.app.models.tenant import Tenant
+    from backend.app.models.integration import Integration
+    from backend.app.models.slack_message import SlackUserMap
+    from backend.app.services.onboarding_welcome import send_welcome_message_if_ready
+    
+    _, session_factory = _get_engine()
+    async with session_factory() as session:
+        try:
+            tenant_id = None
+            
+            # 1. Try SlackUserMap
+            map_stmt = select(SlackUserMap).where(SlackUserMap.slack_team_id == team_id)
+            map_res = await session.execute(map_stmt)
+            slack_map = map_res.scalar_one_or_none()
+            if slack_map and slack_map.tenant_id:
+                tenant_id = slack_map.tenant_id
+                
+            # 2. Try Integration (provider="slack")
+            if not tenant_id:
+                integ_stmt = select(Integration).where(
+                    Integration.provider == "slack",
+                    Integration.provider_connection_id == team_id
+                )
+                integ_res = await session.execute(integ_stmt)
+                integration = integ_res.scalar_one_or_none()
+                if integration and integration.tenant_id:
+                    tenant_id = integration.tenant_id
+
+            # 3. Try Tenant directly
+            if not tenant_id:
+                tenant_stmt = select(Tenant).where(Tenant.slack_team_id == team_id)
+                tenant_res = await session.execute(tenant_stmt)
+                tenant = tenant_res.scalar_one_or_none()
+                if tenant:
+                    tenant_id = tenant.id
+                    
+            if not tenant_id:
+                logger.warning(f"member_joined_channel: No tenant found for slack_team_id {team_id}")
+                return
+                
+            await send_welcome_message_if_ready(tenant_id, session)
+            
+        except Exception as e:
+            logger.error(f"Failed to process member_joined_channel for team {team_id}: {e}")
+
 # Bolt Adapter
 slack_handler = AsyncSlackRequestHandler(slack_app)
 
@@ -110,6 +159,34 @@ async def handle_app_mentions(body: dict, say: callable, logger: logging.Logger)
     # Since we need a new DB session and background processing,
     # we'll offload the heavy lifting to our own async worker to avoid any timeout issues.
     asyncio.create_task(process_slack_message(event))
+
+
+@slack_app.event("member_joined_channel")
+async def handle_member_joined_channel(body: dict, say: callable, logger: logging.Logger, context: dict = None) -> None: # type: ignore
+    event = body.get("event", {})
+    joined_user = event.get("user")
+    
+    # Try to find the bot user ID from authorizations or context
+    bot_user_id = None
+    authorizations = body.get("authorizations")
+    if authorizations and isinstance(authorizations, list) and len(authorizations) > 0:
+        bot_user_id = authorizations[0].get("user_id")
+    
+    if not bot_user_id and context:
+        bot_user_id = context.get("bot_user_id")
+        
+    # Only proceed if the joining user is the bot itself
+    if bot_user_id and joined_user != bot_user_id:
+        return
+        
+    team_id = event.get("team") or body.get("team_id")
+    if not team_id:
+        logger.warning("member_joined_channel event missing team_id")
+        return
+        
+    # Since we need a new DB session and background processing,
+    # we'll offload the welcome check to a background task to avoid timeout issues.
+    asyncio.create_task(_background_member_joined_handler(team_id))
 
 @slack_app.event("message")
 async def handle_message_events(body: dict, say: callable, logger: logging.Logger) -> None: # type: ignore

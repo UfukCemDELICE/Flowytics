@@ -403,3 +403,232 @@ async def test_handle_message_events_ignore_non_im():
         await handle_message_events(body, say=MagicMock(), logger=MagicMock())
         await asyncio.sleep(0.01)
         mock_process.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_member_joined_channel_success():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import asyncio
+    from backend.app.api.v1.slack import handle_member_joined_channel
+    from backend.app.models.tenant import Tenant
+    from backend.app.models.slack_message import SlackUserMap
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+
+    db = InMemoryDB()
+    
+    tenant = Tenant(
+        id="t-mock-welcome-001",
+        clerk_org_id="welcome_org",
+        name="Welcome Co",
+        subscription_status="active",
+        slack_team_id="T_MOCK_TEAM",
+    )
+    db.add(tenant)
+    
+    slack_map = SlackUserMap(
+        tenant_id="t-mock-welcome-001",
+        slack_user_id="U_MOCK_USER",
+        slack_team_id="T_MOCK_TEAM"
+    )
+    db.add(slack_map)
+    await db.commit()
+
+    body = {
+        "team_id": "T_MOCK_TEAM",
+        "authorizations": [
+            {
+                "user_id": "U_BOT_USER"
+            }
+        ],
+        "event": {
+            "type": "member_joined_channel",
+            "channel": "C12345",
+            "user": "U_BOT_USER",
+            "team": "T_MOCK_TEAM"
+        }
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+        
+        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.02)
+        
+        mock_welcome.assert_called_once()
+        assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-001"
+
+
+@pytest.mark.asyncio
+async def test_handle_member_joined_channel_other_user():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import asyncio
+    from backend.app.api.v1.slack import handle_member_joined_channel
+
+    body = {
+        "team_id": "T_MOCK_TEAM",
+        "authorizations": [
+            {
+                "user_id": "U_BOT_USER"
+            }
+        ],
+        "event": {
+            "type": "member_joined_channel",
+            "channel": "C12345",
+            "user": "U_OTHER_USER",
+            "team": "T_MOCK_TEAM"
+        }
+    }
+
+    with patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.01)
+        mock_welcome.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_member_joined_channel_integration_lookup():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import asyncio
+    from backend.app.api.v1.slack import handle_member_joined_channel
+    from backend.app.models.integration import Integration
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+
+    db = InMemoryDB()
+    
+    integration = Integration(
+        id="int-mock-welcome-002",
+        tenant_id="t-mock-welcome-002",
+        provider="slack",
+        provider_connection_id="T_MOCK_TEAM",
+        sync_status="active"
+    )
+    db.add(integration)
+    await db.commit()
+
+    body = {
+        "team_id": "T_MOCK_TEAM",
+        "authorizations": [
+            {
+                "user_id": "U_BOT_USER"
+            }
+        ],
+        "event": {
+            "type": "member_joined_channel",
+            "channel": "C12345",
+            "user": "U_BOT_USER",
+            "team": "T_MOCK_TEAM"
+        }
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+        
+        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.02)
+        
+        mock_welcome.assert_called_once()
+        assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-002"
+
+
+@pytest.mark.asyncio
+async def test_handle_member_joined_channel_tenant_lookup():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import asyncio
+    from backend.app.api.v1.slack import handle_member_joined_channel
+    from backend.app.models.tenant import Tenant
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+
+    db = InMemoryDB()
+    
+    tenant = Tenant(
+        id="t-mock-welcome-003",
+        clerk_org_id="welcome_org_3",
+        name="Welcome Co 3",
+        subscription_status="active",
+        slack_team_id="T_MOCK_TEAM",
+    )
+    db.add(tenant)
+    await db.commit()
+
+    body = {
+        "team_id": "T_MOCK_TEAM",
+        "authorizations": [
+            {
+                "user_id": "U_BOT_USER"
+            }
+        ],
+        "event": {
+            "type": "member_joined_channel",
+            "channel": "C12345",
+            "user": "U_BOT_USER",
+            "team": "T_MOCK_TEAM"
+        }
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+        
+        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.02)
+        
+        mock_welcome.assert_called_once()
+        assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-003"
+
+
+@pytest.mark.asyncio
+async def test_handle_member_joined_channel_context_fallback():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import asyncio
+    from backend.app.api.v1.slack import handle_member_joined_channel
+    from backend.app.models.tenant import Tenant
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+
+    db = InMemoryDB()
+    
+    tenant = Tenant(
+        id="t-mock-welcome-004",
+        clerk_org_id="welcome_org_4",
+        name="Welcome Co 4",
+        subscription_status="active",
+        slack_team_id="T_MOCK_TEAM",
+    )
+    db.add(tenant)
+    await db.commit()
+
+    body = {
+        "team_id": "T_MOCK_TEAM",
+        "event": {
+            "type": "member_joined_channel",
+            "channel": "C12345",
+            "user": "U_BOT_USER",
+            "team": "T_MOCK_TEAM"
+        }
+    }
+    context = {
+        "bot_user_id": "U_BOT_USER"
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+        
+        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock(), context=context)
+        await asyncio.sleep(0.02)
+        
+        mock_welcome.assert_called_once()
+        assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-004"

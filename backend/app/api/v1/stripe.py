@@ -1,6 +1,6 @@
 import logging
 from typing import Mapping
-
+from backend.app.config import get_settings
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ from sqlmodel import select
 
 router = APIRouter(tags=["stripe"])
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 class CheckoutRequest(BaseModel):
     tier: str
@@ -36,6 +37,28 @@ async def api_create_checkout_session(
         cancel_url=request.cancel_url,
     )
     return {"url": url}
+
+@router.post("/stripe/create-portal-session")
+async def create_portal_session(
+    current_user: Mapping = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session)
+) -> dict:
+    from backend.app.integrations.stripe import _setup_stripe
+    _setup_stripe()
+    
+    stmt = select(Tenant).where(Tenant.clerk_org_id == current_user["org_id"])
+    result = await db.execute(stmt)
+    tenant = result.scalar_one_or_none()
+    
+    if not tenant or not tenant.stripe_customer_id:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+    
+    import stripe
+    session = stripe.billing_portal.Session.create(
+        customer=tenant.stripe_customer_id,
+        return_url=f"{settings.FRONTEND_URL}/dashboard"
+    )
+    return {"url": session.url}
 
 @router.post("/stripe/webhook")
 async def stripe_webhook(

@@ -19,6 +19,7 @@ from backend.app.services.slack_agent_runner import process_slack_message
 
 router = APIRouter(prefix="/slack", tags=["slack"])
 logger = logging.getLogger(__name__)
+processed_events = set()  # module level
 
 
 async def _background_welcome_check(tenant_id: str):
@@ -234,6 +235,15 @@ async def slack_events(request: Request) -> Response:
     import os
     try:
         body_dict = json.loads(body)
+        
+        event_id = body_dict.get("event_id")
+        if event_id and event_id in processed_events:
+            return await slack_handler.handle(request)
+        if event_id:
+            processed_events.add(event_id)
+            if len(processed_events) > 100:
+                processed_events.pop()
+
         event = body_dict.get("event", {})
         if event.get("type") == "member_joined_channel":
             team_id = body_dict.get("team_id") or event.get("team")

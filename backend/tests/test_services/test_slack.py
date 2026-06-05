@@ -698,3 +698,50 @@ async def test_slack_events_endpoint_member_joined_channel_mismatch():
         
         mock_bg_handler.assert_not_called()
         mock_bolt_handle.assert_called_once_with(mock_request)
+
+
+@pytest.mark.asyncio
+async def test_slack_events_endpoint_member_joined_channel_deduplication():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import os
+    import json
+    import asyncio
+    from backend.app.api.v1.slack import slack_events, processed_events
+
+    processed_events.clear()
+
+    mock_request = MagicMock()
+    body_data = {
+        "event_id": "evt-dup-123",
+        "team_id": "T_MOCK_TEAM",
+        "event": {
+            "type": "member_joined_channel",
+            "channel": "C12345",
+            "user": "U_BOT_USER",
+            "team": "T_MOCK_TEAM"
+        }
+    }
+    mock_request.body = AsyncMock(return_value=json.dumps(body_data).encode("utf-8"))
+
+    with patch("backend.app.api.v1.slack._background_member_joined_handler") as mock_bg_handler, \
+         patch("backend.app.api.v1.slack.slack_handler.handle", new_callable=AsyncMock) as mock_bolt_handle, \
+         patch.dict(os.environ, {"SLACK_BOT_USER_ID": "U_BOT_USER"}):
+        
+        # First call
+        await slack_events(mock_request)
+        await asyncio.sleep(0.01)
+        
+        mock_bg_handler.assert_called_once_with("T_MOCK_TEAM", "C12345")
+        mock_bolt_handle.assert_called_once_with(mock_request)
+        
+        mock_bg_handler.reset_mock()
+        mock_bolt_handle.reset_mock()
+
+        # Second call with same event_id
+        await slack_events(mock_request)
+        await asyncio.sleep(0.01)
+        
+        # Should NOT trigger mock_bg_handler again because it is duplicate
+        mock_bg_handler.assert_not_called()
+        # Should still delegate to Bolt handler
+        mock_bolt_handle.assert_called_once_with(mock_request)

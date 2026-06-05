@@ -171,3 +171,152 @@ def test_qbo_parser_multi_month_values():
 
     # Check current cash balance
     assert summary.current_cash_balance == Decimal("12000.00")
+
+def test_qbo_parser_two_year_period():
+    from datetime import date, timedelta, datetime
+    from backend.app.tools.qbo_parser import parse_financial_summary
+    
+    # Generate columns from Jun 2024 to Jun 2026
+    start_year, start_month = 2024, 6
+    end_year, end_month = 2026, 6
+    
+    columns_list = [{"colTitle": "", "colType": "Account"}]
+    current_year, current_month = start_year, start_month
+    
+    month_dates = []
+    while (current_year, current_month) <= (end_year, end_month):
+        d = date(current_year, current_month, 1)
+        month_dates.append(d)
+        
+        # Increment month
+        if current_month == 12:
+            current_month = 1
+            current_year += 1
+        else:
+            current_month += 1
+            
+    # Add columns
+    for d in month_dates:
+        col_title = d.strftime("%b %Y") # e.g. Jun 2024
+        start_date_str = d.strftime("%Y-%m-%d")
+        # calculate last day of month d
+        next_m_year = d.year + (1 if d.month == 12 else 0)
+        next_m_month = 1 if d.month == 12 else d.month + 1
+        end_date_str = (date(next_m_year, next_m_month, 1) - timedelta(days=1)).strftime("%Y-%m-%d")
+        
+        columns_list.append({
+            "colTitle": col_title,
+            "colType": "Money",
+            "MetaData": {
+                "StartDate": start_date_str,
+                "EndDate": end_date_str
+            }
+        })
+        
+    # Also add a Total column at the end
+    columns_list.append({"colTitle": "Total", "colType": "Money"})
+    
+    # We have ColData list for each row.
+    income_col_data = [{"value": "Total Income"}]
+    expenses_col_data = [{"value": "Total Expenses"}]
+    cogs_col_data = [{"value": "Total Cost of Goods Sold"}]
+    other_inc_col_data = [{"value": "Total Other Income"}]
+    other_exp_col_data = [{"value": "Total Other Expenses"}]
+    net_inc_col_data = [{"value": "Net Income"}]
+    
+    bank_col_data = [{"value": "Total Bank Accounts"}]
+    
+    for idx, d in enumerate(month_dates):
+        if idx % 2 == 0:
+            # Non-zero month
+            income_col_data.append({"value": str(10000 + idx * 100)})
+            expenses_col_data.append({"value": str(5000 + idx * 50)})
+            cogs_col_data.append({"value": "500"})
+            other_inc_col_data.append({"value": "100"})
+            other_exp_col_data.append({"value": "50"})
+            net_inc_col_data.append({"value": str(10000 + idx * 100 + 100 - (5000 + idx * 50 + 500 + 50))}) # rev - exp
+            bank_col_data.append({"value": str(50000 + idx * 1000)})
+        else:
+            # Zero month
+            income_col_data.append({"value": "0"})
+            expenses_col_data.append({"value": ""}) # empty string
+            cogs_col_data.append({"value": "0"})
+            other_inc_col_data.append({"value": "0"})
+            other_exp_col_data.append({"value": None}) # None value
+            net_inc_col_data.append({"value": "0"})
+            bank_col_data.append({"value": "0"})
+            
+    # Add Total column values
+    income_col_data.append({"value": "99999"})
+    expenses_col_data.append({"value": "99999"})
+    cogs_col_data.append({"value": "99999"})
+    other_inc_col_data.append({"value": "99999"})
+    other_exp_col_data.append({"value": "99999"})
+    net_inc_col_data.append({"value": "99999"})
+    bank_col_data.append({"value": "99999"})
+    
+    pl_data = {
+        "Columns": {"Column": columns_list},
+        "Rows": {
+            "Row": [
+                {"group": "Income", "Summary": {"ColData": income_col_data}},
+                {"group": "Expenses", "Summary": {"ColData": expenses_col_data}},
+                {"group": "COGS", "Summary": {"ColData": cogs_col_data}},
+                {"group": "OtherIncome", "Summary": {"ColData": other_inc_col_data}},
+                {"group": "OtherExpenses", "Summary": {"ColData": other_exp_col_data}},
+                {"group": "NetIncome", "Summary": {"ColData": net_inc_col_data}},
+            ]
+        }
+    }
+    
+    bs_data = {
+        "Columns": {"Column": columns_list},
+        "Rows": {
+            "Row": [
+                {
+                    "group": "TotalAssets",
+                    "Rows": {
+                        "Row": [
+                            {
+                                "group": "CurrentAssets",
+                                "Rows": {
+                                    "Row": [
+                                        {
+                                            "group": "BankAccounts",
+                                            "Summary": {"ColData": bank_col_data}
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+    
+    # Call the parser
+    summary = parse_financial_summary(pl_data, bs_data, date(2026, 6, 30))
+    
+    # Assertions
+    assert len(summary.monthly_financials) >= 10
+    # Expected exactly 13 non-zero months
+    assert len(summary.monthly_financials) == 13
+    
+    # Check that they are sorted chronologically
+    for i in range(len(summary.monthly_financials) - 1):
+        assert summary.monthly_financials[i].month_start < summary.monthly_financials[i+1].month_start
+        
+    # Check values for the first non-zero month (index 0, Jun 2024)
+    first_month = summary.monthly_financials[0]
+    assert first_month.month_start == date(2024, 6, 1)
+    # total_revenue: Income + OtherIncome = 10000 + 100 = 10100
+    assert first_month.total_revenue == Decimal("10100")
+    # total_expenses: Expenses + COGS + OtherExpenses = 5000 + 500 + 50 = 5550
+    assert first_month.total_expenses == Decimal("5550")
+    # net_income: 10100 - 5550 = 4550
+    assert first_month.net_income == Decimal("4550")
+    
+    # Check current cash balance (from the latest month column - Total is excluded because ColTitle is Total, so the last month is Jun 2026 which is idx 25)
+    # The last month's column is Jun 2026, which is an even index, so bank accounts has 50000 + 24 * 1000 = 74000
+    assert summary.current_cash_balance == Decimal("74000")

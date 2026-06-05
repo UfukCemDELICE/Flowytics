@@ -66,7 +66,8 @@ def _find_group_value_for_col(rows: list, group: str, col_idx: int) -> Decimal:
         else:
             # Check the first ColData element's value (usually the account/group name)
             try:
-                first_col = row["Summary"]["ColData"][0].get("value", "")
+                col_data = row.get("Summary", {}).get("ColData", []) or row.get("ColData", [])
+                first_col = col_data[0].get("value", "")
                 if first_col in allowed_labels:
                     match = True
             except Exception:
@@ -74,10 +75,13 @@ def _find_group_value_for_col(rows: list, group: str, col_idx: int) -> Decimal:
                 
         if match:
             try:
-                col_data = row["Summary"]["ColData"]
+                col_data = row.get("Summary", {}).get("ColData", []) or row.get("ColData", [])
                 if col_idx < len(col_data):
                     val = col_data[col_idx].get("value")
-                    return Decimal(str(val)) if val is not None else Decimal("0")
+                    if val is not None:
+                        val_str = str(val).replace(",", "").strip()
+                        return Decimal(val_str) if val_str else Decimal("0")
+                    return Decimal("0")
             except Exception:
                 return Decimal("0")
     return Decimal("0")
@@ -90,7 +94,8 @@ def _find_bank_total_for_col(rows: list, col_idx: int) -> Decimal:
             match_assets = True
         else:
             try:
-                first_col = row["Summary"]["ColData"][0].get("value", "")
+                col_data = row.get("Summary", {}).get("ColData", []) or row.get("ColData", [])
+                first_col = col_data[0].get("value", "")
                 if first_col in ["Total Assets", "TotalAssets"]:
                     match_assets = True
             except Exception:
@@ -104,7 +109,8 @@ def _find_bank_total_for_col(rows: list, col_idx: int) -> Decimal:
                     match_curr = True
                 else:
                     try:
-                        first_col = section["Summary"]["ColData"][0].get("value", "")
+                        col_data = section.get("Summary", {}).get("ColData", []) or section.get("ColData", [])
+                        first_col = col_data[0].get("value", "")
                         if first_col in ["Total Current Assets", "CurrentAssets", "Total CurrentAssets"]:
                             match_curr = True
                     except Exception:
@@ -118,7 +124,8 @@ def _find_bank_total_for_col(rows: list, col_idx: int) -> Decimal:
                             match_bank = True
                         else:
                             try:
-                                first_col = cur["Summary"]["ColData"][0].get("value", "")
+                                col_data = cur.get("Summary", {}).get("ColData", []) or cur.get("ColData", [])
+                                first_col = col_data[0].get("value", "")
                                 if first_col in ["Total Bank Accounts", "Bank Accounts", "BankAccounts", "Total BankAccounts"]:
                                     match_bank = True
                             except Exception:
@@ -126,21 +133,27 @@ def _find_bank_total_for_col(rows: list, col_idx: int) -> Decimal:
                                 
                         if match_bank:
                             try:
-                                col_data = cur["Summary"]["ColData"]
+                                col_data = cur.get("Summary", {}).get("ColData", []) or cur.get("ColData", [])
                                 if col_idx < len(col_data):
                                     val = col_data[col_idx].get("value")
-                                    return Decimal(str(val)) if val is not None else Decimal("0")
+                                    if val is not None:
+                                        val_str = str(val).replace(",", "").strip()
+                                        return Decimal(val_str) if val_str else Decimal("0")
+                                    return Decimal("0")
                             except Exception:
                                 return Decimal("0")
     # Fallback to checking any row if the nested structure is flatter (e.g. mock data)
     for row in rows:
         try:
-            first_col = row["Summary"]["ColData"][0].get("value", "")
+            col_data = row.get("Summary", {}).get("ColData", []) or row.get("ColData", [])
+            first_col = col_data[0].get("value", "")
             if first_col in ["Total Bank Accounts", "Bank Accounts", "BankAccounts", "Total BankAccounts", "Total Assets"]:
-                col_data = row["Summary"]["ColData"]
                 if col_idx < len(col_data):
                     val = col_data[col_idx].get("value")
-                    return Decimal(str(val)) if val is not None else Decimal("0")
+                    if val is not None:
+                        val_str = str(val).replace(",", "").strip()
+                        return Decimal(val_str) if val_str else Decimal("0")
+                    return Decimal("0")
         except Exception:
             pass
             
@@ -151,18 +164,41 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
     month_cols = []
     
     for i, col in enumerate(columns):
-        title = col.get("colTitle", "")
-        if not title or title.lower() in ("total", "account", "row", "collapse"):
+        col_type = col.get("ColType") or col.get("colType") or ""
+        if col_type.lower() == "account":
             continue
-        d = parse_qbo_column_date(title)
+            
+        title = col.get("ColTitle") or col.get("colTitle") or ""
+        if title.lower() in ("total", "collapse", "row"):
+            continue
+            
+        # Try metadata StartDate
+        metadata = col.get("MetaData") or col.get("metadata") or {}
+        start_date_str = metadata.get("StartDate") or metadata.get("startDate")
+        
+        d = None
+        if start_date_str:
+            try:
+                if isinstance(start_date_str, date):
+                    d = start_date_str
+                elif isinstance(start_date_str, datetime):
+                    d = start_date_str.date()
+                else:
+                    d = datetime.strptime(str(start_date_str).strip(), "%Y-%m-%d").date()
+            except ValueError:
+                pass
+                
+        if not d and title:
+            d = parse_qbo_column_date(str(title))
+            
         if d:
             month_cols.append((i, d))
             
+    pl_rows = pl_data.get("Rows", {}).get("Row", [])
+    bs_rows = bs_data.get("Rows", {}).get("Row", [])
+
     if not month_cols:
         # Fallback to existing single-month behavior
-        pl_rows = pl_data.get("Rows", {}).get("Row", [])
-        bs_rows = bs_data.get("Rows", {}).get("Row", [])
-
         total_revenue = _find_group_value_for_col(pl_rows, "Income", 1) + _find_group_value_for_col(pl_rows, "OtherIncome", 1)
         total_expenses = _find_group_value_for_col(pl_rows, "Expenses", 1) + _find_group_value_for_col(pl_rows, "COGS", 1) + _find_group_value_for_col(pl_rows, "OtherExpenses", 1)
         net_income = _find_group_value_for_col(pl_rows, "NetIncome", 1)
@@ -175,36 +211,46 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
             net_income=net_income,
         )
 
+        monthly_financials = []
+        if not (monthly.total_revenue == 0 and monthly.total_expenses == 0 and monthly.net_income == 0):
+            monthly_financials.append(monthly)
+
         return FinancialSummary(
             current_cash_balance=current_cash,
-            monthly_financials=[monthly],
+            monthly_financials=monthly_financials,
         )
         
     monthly_financials = []
-    pl_rows = pl_data.get("Rows", {}).get("Row", [])
-    bs_rows = bs_data.get("Rows", {}).get("Row", [])
-    
-    # Sort columns by date
-    month_cols.sort(key=lambda x: x[1])
     
     for col_idx, month_date in month_cols:
         total_revenue = _find_group_value_for_col(pl_rows, "Income", col_idx) + _find_group_value_for_col(pl_rows, "OtherIncome", col_idx)
         total_expenses = _find_group_value_for_col(pl_rows, "Expenses", col_idx) + _find_group_value_for_col(pl_rows, "COGS", col_idx) + _find_group_value_for_col(pl_rows, "OtherExpenses", col_idx)
         net_income = _find_group_value_for_col(pl_rows, "NetIncome", col_idx)
         
+        # Skip months where total_revenue, total_expenses, and net_income are all 0/empty
+        if total_revenue == 0 and total_expenses == 0 and net_income == 0:
+            continue
+            
         monthly_financials.append(
             MonthlyFinancial(
-                month_start=date(month_date.year, month_date.month, 1),
+                month_start=month_date,
                 total_revenue=total_revenue,
                 total_expenses=total_expenses,
                 net_income=net_income,
             )
         )
         
-    # Get cash balance of the latest month column
-    last_col_idx = month_cols[-1][0]
-    current_cash = _find_bank_total_for_col(bs_rows, last_col_idx)
+    # Sort monthly_financials by month_start
+    monthly_financials.sort(key=lambda x: x.month_start)
     
+    # Get cash balance of the latest month column
+    if month_cols:
+        sorted_month_cols = sorted(month_cols, key=lambda x: x[1])
+        last_col_idx = sorted_month_cols[-1][0]
+        current_cash = _find_bank_total_for_col(bs_rows, last_col_idx)
+    else:
+        current_cash = Decimal("0")
+        
     return FinancialSummary(
         current_cash_balance=current_cash,
         monthly_financials=monthly_financials,

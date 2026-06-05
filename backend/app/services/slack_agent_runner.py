@@ -116,7 +116,11 @@ async def process_slack_message(event: dict):
         
         if not slack_map:
             # Auto-register
-            slack_map = SlackUserMap(slack_user_id=user_id, slack_team_id=team_id)
+            slack_map = SlackUserMap(
+                tenant_id=tenant.id,
+                slack_user_id=user_id,
+                slack_team_id=team_id
+            )
             session.add(slack_map)
         
         # Create an Agent Run Log

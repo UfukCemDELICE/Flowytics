@@ -43,5 +43,6 @@ async def get_me(
         "user_id": user.get("user_id", ""),
         "org_id": org_id,
         "quickbooks_connected": quickbooks_connected,
-        "slack_connected": slack_connected
+        "slack_connected": slack_connected,
+        "subscription_status": tenant.subscription_status if tenant else None
     }

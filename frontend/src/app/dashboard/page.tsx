@@ -18,7 +18,8 @@ export default async function DashboardPage() {
   
   let quickbooksConnected = false;
   let slackConnected = false;
-  
+  let subscriptionStatus = null;
+
   try {
     const res = await fetch(`${apiUrl}/api/v1/me`, {
       headers: {
@@ -30,6 +31,7 @@ export default async function DashboardPage() {
       const data = await res.json();
       quickbooksConnected = !!data.quickbooks_connected;
       slackConnected = !!data.slack_connected;
+      subscriptionStatus = data.subscription_status || null;
     }
   } catch (err) {
     console.error("Failed to fetch user integration status:", err);
@@ -148,7 +150,7 @@ export default async function DashboardPage() {
                   Slack Briefings
                 </li>
               </ul>
-              <StripeCheckoutButton />
+              <StripeCheckoutButton subscriptionStatus={subscriptionStatus}/>
             </div>
           </div>
         </div>

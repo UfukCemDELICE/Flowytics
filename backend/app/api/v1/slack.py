@@ -214,6 +214,10 @@ async def handle_message_events(body: dict, say: callable, logger: logging.Logge
 @router.post("/events/")
 async def slack_events(request: Request) -> Response:
     """Handle incoming Slack events via Bolt."""
+    body = await request.body()
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Slack raw body: {body[:500]}")
     return await slack_handler.handle(request)
 
 @router.post("/trigger_monthly_report")

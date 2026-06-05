@@ -47,7 +47,17 @@ def call_model(state: AgentState) -> dict:
     # 1. Base Core Prompt
     system_text = load_prompt("system_base.txt")
     if summary:
-        system_text += f"\n\nCURRENT FINANCIAL CONTEXT:\nCash: ${summary.current_cash_balance:,.2f}"
+        monthly_text = ""
+        for m in summary.monthly_financials:
+            monthly_text += (
+                f"\n- {m.month_start}: Revenue ${m.total_revenue:,.2f}, "
+                f"Expenses ${m.total_expenses:,.2f}, Net Income ${m.net_income:,.2f}"
+            )
+        system_text += (
+            f"\n\nCURRENT FINANCIAL CONTEXT:"
+            f"\nCash Balance: ${summary.current_cash_balance:,.2f}"
+            f"\nMonthly Financials:{monthly_text}"
+        )
         
     # 2. Dynamic Injector (Save token bounds)
     recent_text = str([str(m.content) for m in messages[-3:]]).lower()

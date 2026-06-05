@@ -105,11 +105,30 @@ async def oauth_redirect(
 @slack_app.event("app_mention")
 async def handle_app_mentions(body: dict, say: callable, logger: logging.Logger) -> None: # type: ignore
     event = body.get("event", {})
+    if "team" not in event:
+        event["team"] = body.get("team_id")
     # Since we need a new DB session and background processing,
     # we'll offload the heavy lifting to our own async worker to avoid any timeout issues.
     asyncio.create_task(process_slack_message(event))
 
+@slack_app.event("message")
+async def handle_message_events(body: dict, say: callable, logger: logging.Logger) -> None: # type: ignore
+    event = body.get("event", {})
+    # Ignore bot messages to prevent infinite loops
+    if event.get("bot_id") or event.get("subtype") == "bot_message":
+        return
+        
+    channel = event.get("channel", "")
+    channel_type = event.get("channel_type")
+    
+    # Process only Direct Messages (IMs)
+    if channel_type == "im" or channel.startswith("D"):
+        if "team" not in event:
+            event["team"] = body.get("team_id")
+        asyncio.create_task(process_slack_message(event))
+
 @router.post("/events")
+@router.post("/events/")
 async def slack_events(request: Request) -> Response:
     """Handle incoming Slack events via Bolt."""
     return await slack_handler.handle(request)

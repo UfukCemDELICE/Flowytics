@@ -324,3 +324,82 @@ async def test_slack_agent_runner_no_snapshots():
         assert len(agent_runs) == 1
         assert agent_runs[0].is_successful is False
         assert agent_runs[0].error_message == "Please connect your QuickBooks account first."
+
+
+@pytest.mark.asyncio
+async def test_handle_message_events_im():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import asyncio
+    from backend.app.api.v1.slack import handle_message_events
+
+    body = {
+        "team_id": "T_MOCK_TEAM",
+        "event": {
+            "type": "message",
+            "channel": "D12345",
+            "channel_type": "im",
+            "user": "U_USER",
+            "text": "What is my burn rate?",
+            "ts": "12345.67"
+        }
+    }
+
+    with patch("backend.app.api.v1.slack.process_slack_message", new_callable=AsyncMock) as mock_process:
+        await handle_message_events(body, say=MagicMock(), logger=MagicMock())
+        # Yield to let the event loop execute the scheduled task
+        await asyncio.sleep(0.01)
+        mock_process.assert_called_once()
+        called_event = mock_process.call_args[0][0]
+        assert called_event["team"] == "T_MOCK_TEAM"
+        assert called_event["channel"] == "D12345"
+
+
+@pytest.mark.asyncio
+async def test_handle_message_events_ignore_bot():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import asyncio
+    from backend.app.api.v1.slack import handle_message_events
+
+    # Bot message event
+    body = {
+        "team_id": "T_MOCK_TEAM",
+        "event": {
+            "type": "message",
+            "channel": "D12345",
+            "channel_type": "im",
+            "user": "U_USER",
+            "text": "What is my burn rate?",
+            "ts": "12345.67",
+            "bot_id": "B12345"
+        }
+    }
+
+    with patch("backend.app.api.v1.slack.process_slack_message", new_callable=AsyncMock) as mock_process:
+        await handle_message_events(body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.01)
+        mock_process.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_message_events_ignore_non_im():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import asyncio
+    from backend.app.api.v1.slack import handle_message_events
+
+    # Message event in a public channel without mention
+    body = {
+        "team_id": "T_MOCK_TEAM",
+        "event": {
+            "type": "message",
+            "channel": "C12345",
+            "channel_type": "channel",
+            "user": "U_USER",
+            "text": "Just chit chat",
+            "ts": "12345.67"
+        }
+    }
+
+    with patch("backend.app.api.v1.slack.process_slack_message", new_callable=AsyncMock) as mock_process:
+        await handle_message_events(body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.01)
+        mock_process.assert_not_called()

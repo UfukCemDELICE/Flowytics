@@ -213,7 +213,11 @@ async def _get_report_date_range(tenant_id: str, session: AsyncSession) -> tuple
 
 async def get_profit_and_loss(realm_id: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
     start_date_str, end_date_str = await _get_report_date_range(tenant_id, session)
-    return await _fetch_report(realm_id, "ProfitAndLoss", start_date_str, end_date_str, tenant_id, session)
+    response = await _fetch_report(realm_id, "ProfitAndLoss", start_date_str, end_date_str, tenant_id, session)
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"QBO P&L raw: {str(response)[:3000]}")
+    return response
 
 async def get_balance_sheet(realm_id: str, start_date: str, end_date: str, tenant_id: str, session: AsyncSession) -> dict:
     start_date_str, end_date_str = await _get_report_date_range(tenant_id, session)

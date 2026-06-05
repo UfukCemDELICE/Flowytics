@@ -47,6 +47,19 @@ def parse_qbo_column_date(col_title: str) -> date | None:
         
     return None
 
+def _get_meta_value(metadata_list, key: str):
+    if isinstance(metadata_list, list):
+        for item in metadata_list:
+            if item.get("Name") == key or item.get("Name") == key.lower() or item.get("Name") == (key[0].lower() + key[1:]):
+                return item.get("Value")
+            if item.get("name") == key or item.get("name") == key.lower() or item.get("name") == (key[0].lower() + key[1:]):
+                return item.get("value")
+    elif isinstance(metadata_list, dict):
+        return (metadata_list.get(key) or 
+                metadata_list.get(key.lower()) or 
+                metadata_list.get(key[0].lower() + key[1:]))
+    return None
+
 def _find_group_value_for_col(rows: list, group: str, col_idx: int) -> Decimal:
     """QBO row listesinden group adına veya label'a göre belirli kolondaki Summary değerini çıkarır."""
     group_labels = {
@@ -174,7 +187,7 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
             
         # Try metadata StartDate
         metadata = col.get("MetaData") or col.get("metadata") or {}
-        start_date_str = metadata.get("StartDate") or metadata.get("startDate")
+        start_date_str = _get_meta_value(metadata, "StartDate")
         
         d = None
         if start_date_str:

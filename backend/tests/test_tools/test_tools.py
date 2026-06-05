@@ -207,10 +207,10 @@ def test_qbo_parser_two_year_period():
         columns_list.append({
             "colTitle": col_title,
             "colType": "Money",
-            "MetaData": {
-                "StartDate": start_date_str,
-                "EndDate": end_date_str
-            }
+            "MetaData": [
+                {"Name": "StartDate", "Value": start_date_str},
+                {"Name": "EndDate", "Value": end_date_str}
+            ]
         })
         
     # Also add a Total column at the end

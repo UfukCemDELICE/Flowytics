@@ -33,6 +33,7 @@ async def send_welcome_message_if_ready(tenant_id: str | UUID, session=None) -> 
     Returns:
         True if welcome was sent, False if conditions weren't met or already sent.
     """
+    logger.info(f"send_welcome_message_if_ready called: tenant_id={tenant_id}")
     owns_session = session is None
     if owns_session:
         _, session_factory = _get_engine()
@@ -70,13 +71,17 @@ async def _check_and_send(tenant_id: str | UUID, session) -> bool:
         logger.warning(f"Welcome check: tenant not found for ID {tenant_id}")
         return False
 
+    logger.info(f"tenant found: onboarding_completed={tenant.onboarding_completed}, slack_connected={bool(tenant.slack_team_id)}")
+
     # 2. Idempotency gate — already sent
     if tenant.onboarding_completed:
+        logger.info(f"Welcome check: message NOT sent because onboarding_completed is True for tenant {tenant.id}")
         logger.debug(f"Welcome already sent for tenant {tenant.id}")
         return False
 
     # 3. Check milestone: Slack connected
     if not tenant.slack_team_id:
+        logger.info(f"Welcome check: message NOT sent because Slack is not connected (slack_team_id is missing) for tenant {tenant.id}")
         logger.debug(f"Welcome deferred: Slack not yet connected for tenant {tenant.id}")
         return False
 
@@ -90,6 +95,7 @@ async def _check_and_send(tenant_id: str | UUID, session) -> bool:
     integration = integ_result.scalar_one_or_none()
 
     if not integration:
+        logger.info(f"Welcome check: message NOT sent because QuickBooks integration is missing or has not synced yet for tenant {tenant.id}")
         logger.debug(f"Welcome deferred: QBO not yet synced for tenant {tenant.id}")
         return False
 
@@ -99,6 +105,7 @@ async def _check_and_send(tenant_id: str | UUID, session) -> bool:
     blocks = _build_welcome_blocks(tenant.name)
     fallback_text = "✅ Flowytics is connected! Your AI CFO is ready. Your first financial report will arrive within 24 hours."
 
+    logger.info(f"sending welcome message to tenant_id={tenant_id}")
     success = await client.send_message(channel, fallback_text, blocks=blocks)
 
     if success:

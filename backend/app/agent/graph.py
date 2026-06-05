@@ -84,19 +84,17 @@ def should_continue(state: AgentState) -> str:
     last_msg = messages[-1]
     if getattr(last_msg, "tool_calls", None):
         return "tools"
-    return "cross_validate"
+    return "end"
 
 workflow = StateGraph(AgentState)
 
 workflow.add_node("select_model", route_query_complexity)
 workflow.add_node("agent", call_model)
 workflow.add_node("tools", tool_node)
-workflow.add_node("cross_validate", cross_validate_math)
 
 workflow.add_edge(START, "select_model")
 workflow.add_edge("select_model", "agent")
-workflow.add_conditional_edges("agent", should_continue, {"tools": "tools", "cross_validate": "cross_validate"})
+workflow.add_conditional_edges("agent", should_continue, {"tools": "tools", "end": END})
 workflow.add_edge("tools", "agent")
-workflow.add_conditional_edges("cross_validate", validation_edge, {"needs_correction": "agent", "end": END})
 
 app = workflow.compile()

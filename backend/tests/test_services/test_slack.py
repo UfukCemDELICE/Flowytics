@@ -455,7 +455,7 @@ async def test_handle_member_joined_channel_success():
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
          patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
         
-        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock())
+        await handle_member_joined_channel(body["event"], body, logger=MagicMock())
         await asyncio.sleep(0.02)
         
         mock_welcome.assert_called_once()
@@ -484,7 +484,7 @@ async def test_handle_member_joined_channel_other_user():
     }
 
     with patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
-        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock())
+        await handle_member_joined_channel(body["event"], body, logger=MagicMock())
         await asyncio.sleep(0.01)
         mock_welcome.assert_not_called()
 
@@ -531,7 +531,7 @@ async def test_handle_member_joined_channel_integration_lookup():
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
          patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
         
-        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock())
+        await handle_member_joined_channel(body["event"], body, logger=MagicMock())
         await asyncio.sleep(0.02)
         
         mock_welcome.assert_called_once()
@@ -580,7 +580,7 @@ async def test_handle_member_joined_channel_tenant_lookup():
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
          patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
         
-        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock())
+        await handle_member_joined_channel(body["event"], body, logger=MagicMock())
         await asyncio.sleep(0.02)
         
         mock_welcome.assert_called_once()
@@ -627,7 +627,7 @@ async def test_handle_member_joined_channel_context_fallback():
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
          patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
         
-        await handle_member_joined_channel(body, say=MagicMock(), logger=MagicMock(), context=context)
+        await handle_member_joined_channel(body["event"], body, logger=MagicMock(), context=context)
         await asyncio.sleep(0.02)
         
         mock_welcome.assert_called_once()

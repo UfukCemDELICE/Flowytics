@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 import jwt
 import asyncio
@@ -162,8 +163,8 @@ async def handle_app_mentions(body: dict, say: callable, logger: logging.Logger)
 
 
 @slack_app.event("member_joined_channel")
-async def handle_member_joined_channel(body: dict, say: callable, logger: logging.Logger, context: dict = None) -> None: # type: ignore
-    event = body.get("event", {})
+async def handle_member_joined_channel(event: dict, body: dict, logger: logging.Logger, context: dict = None) -> None: # type: ignore
+    logger.info(f"member_joined_channel event received: {event}")
     joined_user = event.get("user")
     
     # Try to find the bot user ID from authorizations or context
@@ -187,6 +188,11 @@ async def handle_member_joined_channel(body: dict, say: callable, logger: loggin
     # Since we need a new DB session and background processing,
     # we'll offload the welcome check to a background task to avoid timeout issues.
     asyncio.create_task(_background_member_joined_handler(team_id))
+
+
+@slack_app.event(re.compile(".*"))
+async def log_all_events(event: dict, logger: logging.Logger) -> None: # type: ignore
+    logger.info(f"Slack event received: {event.get('type', 'unknown')}")
 
 @slack_app.event("message")
 async def handle_message_events(body: dict, say: callable, logger: logging.Logger) -> None: # type: ignore

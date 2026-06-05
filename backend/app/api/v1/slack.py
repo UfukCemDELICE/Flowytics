@@ -227,6 +227,7 @@ async def slack_events(request: Request) -> Response:
         if event.get("type") == "member_joined_channel":
             team_id = body_dict.get("team_id") or event.get("team")
             bot_user_id = os.getenv("SLACK_BOT_USER_ID")
+            logger.info(f"member_joined_channel check: event_user={event.get('user')}, bot_user_id={bot_user_id}")
             if bot_user_id and event.get("user") == bot_user_id:
                 asyncio.create_task(_background_member_joined_handler(team_id))
     except Exception as e:

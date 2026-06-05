@@ -33,14 +33,14 @@ async def _background_welcome_check(tenant_id: str):
             logger.error(f"Welcome check failed after Slack connect for tenant {tenant_id}: {e}")
 
 
-async def _background_member_joined_handler(team_id: str):
+async def _background_member_joined_handler(team_id: str, channel_id: str):
     """Background task to handle bot joining a channel: find tenant and check welcome message."""
-    logger.info(f"_background_member_joined_handler called: team_id={team_id}")
+    logger.info(f"_background_member_joined_handler called: team_id={team_id}, channel_id={channel_id}")
     from backend.app.database import _get_engine
     from backend.app.models.tenant import Tenant
     from backend.app.models.integration import Integration
     from backend.app.models.slack_message import SlackUserMap
-    from backend.app.services.onboarding_welcome import send_welcome_message_if_ready
+    from backend.app.services.onboarding_welcome import send_channel_greeting
     
     _, session_factory = _get_engine()
     async with session_factory() as session:
@@ -77,17 +77,17 @@ async def _background_member_joined_handler(team_id: str):
                 logger.warning(f"member_joined_channel: No tenant found for slack_team_id {team_id}")
                 return
                 
-            await send_welcome_message_if_ready(tenant_id, session)
+            await send_channel_greeting(tenant_id, channel_id, session)
             
         except Exception as e:
             logger.error(f"Failed to process member_joined_channel for team {team_id}: {e}")
 
 
-async def _safe_member_joined_handler(team_id: str):
+async def _safe_member_joined_handler(team_id: str, channel_id: str):
     try:
-        logger.info(f"_background_member_joined_handler starting: team_id={team_id}")
-        await _background_member_joined_handler(team_id)
-        logger.info(f"_background_member_joined_handler completed: team_id={team_id}")
+        logger.info(f"_background_member_joined_handler starting: team_id={team_id}, channel_id={channel_id}")
+        await _background_member_joined_handler(team_id, channel_id)
+        logger.info(f"_background_member_joined_handler completed: team_id={team_id}, channel_id={channel_id}")
     except Exception as e:
         logger.error(f"member_joined_channel handler failed: {e}", exc_info=True)
 
@@ -191,13 +191,14 @@ async def handle_member_joined_channel(event: dict, body: dict, logger: logging.
         return
         
     team_id = event.get("team") or body.get("team_id")
+    channel_id = event.get("channel")
     if not team_id:
         logger.warning("member_joined_channel event missing team_id")
         return
         
     # Since we need a new DB session and background processing,
     # we'll offload the welcome check to a background task to avoid timeout issues.
-    asyncio.create_task(_safe_member_joined_handler(team_id))
+    asyncio.create_task(_safe_member_joined_handler(team_id, channel_id))
 
 
 @slack_app.event(re.compile(".*"))
@@ -236,10 +237,11 @@ async def slack_events(request: Request) -> Response:
         event = body_dict.get("event", {})
         if event.get("type") == "member_joined_channel":
             team_id = body_dict.get("team_id") or event.get("team")
+            channel_id = event.get("channel")
             bot_user_id = os.getenv("SLACK_BOT_USER_ID")
             logger.info(f"member_joined_channel check: event_user={event.get('user')}, bot_user_id={bot_user_id}")
             if bot_user_id and event.get("user") == bot_user_id:
-                asyncio.create_task(_safe_member_joined_handler(team_id))
+                asyncio.create_task(_safe_member_joined_handler(team_id, channel_id))
     except Exception as e:
         logger.debug(f"Could not parse request body as JSON for manual event dispatch: {e}")
         

@@ -453,13 +453,14 @@ async def test_handle_member_joined_channel_success():
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
-         patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+         patch("backend.app.services.onboarding_welcome.send_channel_greeting", new_callable=AsyncMock) as mock_welcome:
         
         await handle_member_joined_channel(body["event"], body, logger=MagicMock())
         await asyncio.sleep(0.02)
         
         mock_welcome.assert_called_once()
         assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-001"
+        assert mock_welcome.call_args[0][1] == "C12345"
 
 
 @pytest.mark.asyncio
@@ -483,7 +484,7 @@ async def test_handle_member_joined_channel_other_user():
         }
     }
 
-    with patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+    with patch("backend.app.services.onboarding_welcome.send_channel_greeting", new_callable=AsyncMock) as mock_welcome:
         await handle_member_joined_channel(body["event"], body, logger=MagicMock())
         await asyncio.sleep(0.01)
         mock_welcome.assert_not_called()
@@ -529,13 +530,14 @@ async def test_handle_member_joined_channel_integration_lookup():
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
-         patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+         patch("backend.app.services.onboarding_welcome.send_channel_greeting", new_callable=AsyncMock) as mock_welcome:
         
         await handle_member_joined_channel(body["event"], body, logger=MagicMock())
         await asyncio.sleep(0.02)
         
         mock_welcome.assert_called_once()
         assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-002"
+        assert mock_welcome.call_args[0][1] == "C12345"
 
 
 @pytest.mark.asyncio
@@ -578,13 +580,14 @@ async def test_handle_member_joined_channel_tenant_lookup():
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
-         patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+         patch("backend.app.services.onboarding_welcome.send_channel_greeting", new_callable=AsyncMock) as mock_welcome:
         
         await handle_member_joined_channel(body["event"], body, logger=MagicMock())
         await asyncio.sleep(0.02)
         
         mock_welcome.assert_called_once()
         assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-003"
+        assert mock_welcome.call_args[0][1] == "C12345"
 
 
 @pytest.mark.asyncio
@@ -625,13 +628,14 @@ async def test_handle_member_joined_channel_context_fallback():
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)), \
-         patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+         patch("backend.app.services.onboarding_welcome.send_channel_greeting", new_callable=AsyncMock) as mock_welcome:
         
         await handle_member_joined_channel(body["event"], body, logger=MagicMock(), context=context)
         await asyncio.sleep(0.02)
         
         mock_welcome.assert_called_once()
         assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-004"
+        assert mock_welcome.call_args[0][1] == "C12345"
 
 
 @pytest.mark.asyncio
@@ -661,7 +665,7 @@ async def test_slack_events_endpoint_member_joined_channel():
         await slack_events(mock_request)
         await asyncio.sleep(0.01)
         
-        mock_bg_handler.assert_called_once_with("T_MOCK_TEAM")
+        mock_bg_handler.assert_called_once_with("T_MOCK_TEAM", "C12345")
         mock_bolt_handle.assert_called_once_with(mock_request)
 
 

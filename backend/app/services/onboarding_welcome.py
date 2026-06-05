@@ -182,3 +182,46 @@ def _build_welcome_blocks(company_name: str) -> list:
             ],
         },
     ]
+
+
+async def send_channel_greeting(tenant_id: UUID, channel_id: str, session) -> None:
+    """Bot yeni bir kanala eklenince kısa karşılama mesajı gönderir."""
+    from backend.app.models.tenant import Tenant
+    from backend.app.integrations.slack import SlackClient
+    from uuid import UUID
+
+    tenant_uuid: UUID | str
+    if isinstance(tenant_id, UUID):
+        tenant_uuid = tenant_id
+    else:
+        try:
+            tenant_uuid = UUID(str(tenant_id))
+        except ValueError:
+            tenant_uuid = tenant_id
+
+    stmt = select(Tenant).where(Tenant.id == tenant_uuid)
+    result = await session.execute(stmt)
+    tenant = result.scalar_one_or_none()
+    
+    if not tenant:
+        logger.warning(f"send_channel_greeting: tenant not found for ID {tenant_id}")
+        return
+    
+    company_name = tenant.name or "your company"
+    
+    blocks = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn", 
+                "text": f"👋 Hi! I'm your Flowytics CFO Agent for *{company_name}*.\n\nAsk me anything about your finances:\n• `What's my burn rate?`\n• `How many months of runway do I have?`\n• `What if I hire an engineer at $8K/month?`"
+            }
+        }
+    ]
+    
+    client = SlackClient()
+    await client.client.chat_postMessage(
+        channel=channel_id, 
+        blocks=blocks, 
+        text=f"👋 Hi! I'm your Flowytics CFO Agent for {company_name}."
+    )

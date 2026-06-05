@@ -144,6 +144,8 @@ async def process_slack_message(event: dict):
             await session.commit()
             return
 
+        import time
+        start_time = time.perf_counter()
         try:
             # Fetch QBO snapshots and build financial summary
             pl_stmt = select(FinancialSnapshot).where(
@@ -171,6 +173,18 @@ async def process_slack_message(event: dict):
                 "financial_summary": financial_summary
             }
             result = await agent_app.ainvoke(inputs)
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+
+            # extract tools called
+            tools_called = []
+            for msg in result.get("messages", []):
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        t_name = tc.get("name")
+                        if t_name and t_name not in tools_called:
+                            tools_called.append(t_name)
+
+            model_used = result.get("recommended_model") or "claude-sonnet-4-6"
 
             final_message = result["messages"][-1].content
 
@@ -200,10 +214,15 @@ async def process_slack_message(event: dict):
             session.add(out_msg)
 
             agent_run.is_successful = True
+            agent_run.status = "completed"
             agent_run.response = final_message
+            agent_run.tools_called = tools_called
+            agent_run.model_used = model_used
+            agent_run.duration_ms = duration_ms
             await session.commit()
 
         except (TokenExpiredError, IntegrationError) as e:
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
             logger.error(
                 "QBO integration error during agent invocation",
                 extra={"tenant_id": tenant.id, "error_type": type(e).__name__, "provider": "quickbooks"},
@@ -216,10 +235,14 @@ async def process_slack_message(event: dict):
             )
             error_text = f"⚠️ QuickBooks connection error: {str(e)}"
             await client.send_reply(channel, thread_ts, error_text, blocks=error_blocks)
+            agent_run.is_successful = False
+            agent_run.status = "failed"
             agent_run.error_message = str(e)
+            agent_run.duration_ms = duration_ms
             await session.commit()
 
         except Exception as e:
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
             logger.error(
                 "Agent invocation failed",
                 extra={"tenant_id": tenant.id, "error_type": type(e).__name__, "service": "langgraph"},
@@ -230,5 +253,8 @@ async def process_slack_message(event: dict):
                 message="I encountered an error processing your request. Please try again later.",
             )
             await client.send_reply(channel, thread_ts, "Processing error — please try again.", blocks=error_blocks)
+            agent_run.is_successful = False
+            agent_run.status = "failed"
             agent_run.error_message = str(e)
+            agent_run.duration_ms = duration_ms
             await session.commit()

@@ -43,3 +43,39 @@ def test_cash_forecast_dying(profile_dying):
     forecast = calculate_cash_forecast.invoke({"summary": profile_dying})
     assert forecast.zero_cash_week is not None
     assert forecast.zero_cash_week <= 5
+
+def test_qbo_parser_sandbox_values():
+    from datetime import date
+    from backend.app.tools.qbo_parser import parse_financial_summary
+
+    pl_data = {
+        "Rows": {
+            "Row": [
+                {
+                    "group": "Income",
+                    "Summary": {"ColData": [{}, {"value": "10200.77"}]}
+                },
+                {
+                    "group": "Expenses",
+                    "Summary": {"ColData": [{}, {"value": "5642.31"}]}
+                },
+                {
+                    "group": "OtherExpenses",
+                    "Summary": {"ColData": [{}, {"value": "2916.00"}]}
+                },
+                {
+                    "group": "NetIncome",
+                    "Summary": {"ColData": [{}, {"value": "1642.46"}]}
+                }
+            ]
+        }
+    }
+    bs_data = {"Rows": {"Row": []}}
+    
+    summary = parse_financial_summary(pl_data, bs_data, date(2026, 6, 5))
+    monthly = summary.monthly_financials[0]
+    
+    assert monthly.total_revenue == Decimal("10200.77")
+    assert monthly.total_expenses == Decimal("8558.31")
+    assert monthly.net_income == Decimal("1642.46")
+    assert monthly.total_revenue - monthly.total_expenses == monthly.net_income

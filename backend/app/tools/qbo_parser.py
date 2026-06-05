@@ -32,8 +32,8 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
     pl_rows = pl_data.get("Rows", {}).get("Row", [])
     bs_rows = bs_data.get("Rows", {}).get("Row", [])
 
-    total_revenue = _find_group_value(pl_rows, "Income")
-    total_expenses = _find_group_value(pl_rows, "Expenses") + _find_group_value(pl_rows, "COGS")
+    total_revenue = _find_group_value(pl_rows, "Income") + _find_group_value(pl_rows, "OtherIncome")
+    total_expenses = _find_group_value(pl_rows, "Expenses") + _find_group_value(pl_rows, "COGS") + _find_group_value(pl_rows, "OtherExpenses")
     net_income = _find_group_value(pl_rows, "NetIncome")
     current_cash = _find_bank_total(bs_rows)
 

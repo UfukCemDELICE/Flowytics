@@ -11,8 +11,9 @@ settings = get_settings()
 
 # Initialize the Bolt AsyncApp
 slack_app = AsyncApp(
-    token=settings.SLACK_BOT_TOKEN or "xoxb-dummy-token",
-    signing_secret=settings.SLACK_SIGNING_SECRET or "dummy-secret"
+    token=settings.SLACK_BOT_TOKEN,
+    signing_secret=settings.SLACK_SIGNING_SECRET,
+    oauth_settings=None  # OAuth mode'u disable et
 )
 
 # ── Block Kit Constants ─────────────────────────────────────────

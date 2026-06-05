@@ -7,17 +7,24 @@ def test_route_query_complexity():
     # Haiku Triggers (Greetings)
     state = {"messages": [HumanMessage(content="Hello!")]}
     res = route_query_complexity({"messages": [HumanMessage(content="Hello")]})
-    assert res["recommended_model"] == "claude-4-5-haiku-latest"
+    assert res["recommended_model"] == "claude-haiku-4-5-20251001"
     
     # Opus Triggers (Deep Scenarios)
     state2 = {"messages": [HumanMessage(content="simulate what happens if we fire 5 people")]}
     res2 = route_query_complexity({"messages": [HumanMessage(content="What if i hire 2 people?")]})
-    assert res2["recommended_model"] == "claude-4-6-opus-latest"
+    assert res2["recommended_model"] == "claude-opus-4-8"
     
-    # Sonnet Triggers (Standard/Fallback)
-    state3 = {"messages": [HumanMessage(content="What is my burn rate right now?")]}
+    # Haiku Triggers (Simple Financial without Sonnet keywords)
     res3 = route_query_complexity({"messages": [HumanMessage(content="Show me my runway")]})
-    assert res3["recommended_model"] == "claude-4-6-sonnet-latest"
+    assert res3["recommended_model"] == "claude-haiku-4-5-20251001"
+
+    # Sonnet Triggers (Analysis/Explain/Forecast etc.)
+    res4 = route_query_complexity({"messages": [HumanMessage(content="Explain my burn rate")]})
+    assert res4["recommended_model"] == "claude-sonnet-4-6"
+
+    # Default (Fallback to Sonnet)
+    res_default = route_query_complexity({"messages": [HumanMessage(content="Explain general startup trends for 2026")]})
+    assert res_default["recommended_model"] == "claude-sonnet-4-6"
 
 def test_should_continue():
     # State containing LLM output mapping directly to Python function calls
@@ -31,8 +38,8 @@ def test_should_continue():
     ai_answer = AIMessage(content="Here is your answer.")
     state2 = {"messages": [ai_answer]}
     
-    # Expect Edge Router -> "cross_validate" (Safety catch)
-    assert should_continue(state2) == "cross_validate"
+    # Expect Edge Router -> "end"
+    assert should_continue(state2) == "end"
 
 def test_cross_validate_math_clean():
     # Tool generates 12.5 months runway

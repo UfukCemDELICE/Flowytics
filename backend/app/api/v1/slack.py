@@ -218,6 +218,20 @@ async def slack_events(request: Request) -> Response:
     import logging
     logger = logging.getLogger(__name__)
     logger.info(f"Slack raw body: {body[:500]}")
+    
+    import json
+    import os
+    try:
+        body_dict = json.loads(body)
+        event = body_dict.get("event", {})
+        if event.get("type") == "member_joined_channel":
+            team_id = body_dict.get("team_id") or event.get("team")
+            bot_user_id = os.getenv("SLACK_BOT_USER_ID")
+            if bot_user_id and event.get("user") == bot_user_id:
+                asyncio.create_task(_background_member_joined_handler(team_id))
+    except Exception as e:
+        logger.debug(f"Could not parse request body as JSON for manual event dispatch: {e}")
+        
     return await slack_handler.handle(request)
 
 @router.post("/trigger_monthly_report")

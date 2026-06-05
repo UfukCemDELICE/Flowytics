@@ -19,7 +19,6 @@ from backend.app.services.slack_agent_runner import process_slack_message
 
 router = APIRouter(prefix="/slack", tags=["slack"])
 logger = logging.getLogger(__name__)
-processed_events = set()  # module level
 
 
 async def _background_welcome_check(tenant_id: str):
@@ -173,33 +172,6 @@ async def handle_app_mentions(body: dict, say: callable, logger: logging.Logger)
     asyncio.create_task(process_slack_message(event))
 
 
-@slack_app.event("member_joined_channel")
-async def handle_member_joined_channel(event: dict, body: dict, logger: logging.Logger, context: dict = None) -> None: # type: ignore
-    logger.info(f"member_joined_channel event received: {event}")
-    joined_user = event.get("user")
-    
-    # Try to find the bot user ID from authorizations or context
-    bot_user_id = None
-    authorizations = body.get("authorizations")
-    if authorizations and isinstance(authorizations, list) and len(authorizations) > 0:
-        bot_user_id = authorizations[0].get("user_id")
-    
-    if not bot_user_id and context:
-        bot_user_id = context.get("bot_user_id")
-        
-    # Only proceed if the joining user is the bot itself
-    if bot_user_id and joined_user != bot_user_id:
-        return
-        
-    team_id = event.get("team") or body.get("team_id")
-    channel_id = event.get("channel")
-    if not team_id:
-        logger.warning("member_joined_channel event missing team_id")
-        return
-        
-    # Since we need a new DB session and background processing,
-    # we'll offload the welcome check to a background task to avoid timeout issues.
-    asyncio.create_task(_safe_member_joined_handler(team_id, channel_id))
 
 
 @slack_app.event(re.compile(".*"))
@@ -235,15 +207,6 @@ async def slack_events(request: Request) -> Response:
     import os
     try:
         body_dict = json.loads(body)
-        
-        event_id = body_dict.get("event_id")
-        if event_id and event_id in processed_events:
-            return await slack_handler.handle(request)
-        if event_id:
-            processed_events.add(event_id)
-            if len(processed_events) > 100:
-                processed_events.pop()
-
         event = body_dict.get("event", {})
         if event.get("type") == "member_joined_channel":
             team_id = body_dict.get("team_id") or event.get("team")

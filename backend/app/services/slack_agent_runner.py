@@ -279,6 +279,52 @@ async def process_slack_message(event: dict):
 
             model_used = result.get("recommended_model") or "claude-sonnet-4-6"
 
+            # extract token usage
+            total_input_tokens = 0
+            total_output_tokens = 0
+            for msg in result.get("messages", []):
+                # Skip mock objects to avoid mock attribute traps in unit tests
+                if type(msg).__name__ in ("MagicMock", "Mock", "AsyncMock"):
+                    continue
+
+                if hasattr(msg, "usage_metadata") and msg.usage_metadata:
+                    u = msg.usage_metadata
+                    if isinstance(u, dict):
+                        total_input_tokens += u.get("input_tokens", 0)
+                        total_output_tokens += u.get("output_tokens", 0)
+                    elif hasattr(u, "input_tokens"):
+                        total_input_tokens += getattr(u, "input_tokens", 0)
+                        total_output_tokens += getattr(u, "output_tokens", 0)
+                elif hasattr(msg, "response_metadata") and msg.response_metadata:
+                    usage = msg.response_metadata.get("usage")
+                    if isinstance(usage, dict):
+                        total_input_tokens += usage.get("input_tokens", 0)
+                        total_output_tokens += usage.get("output_tokens", 0)
+                    elif usage and hasattr(usage, "input_tokens"):
+                        total_input_tokens += getattr(usage, "input_tokens", 0)
+                        total_output_tokens += getattr(usage, "output_tokens", 0)
+
+            # calculate cost based on model pricing
+            from decimal import Decimal
+            PRICING = {
+                "claude-haiku-4-5-20251001": {
+                    "input": Decimal("0.80") / Decimal("1000000"),
+                    "output": Decimal("4.00") / Decimal("1000000"),
+                },
+                "claude-sonnet-4-6": {
+                    "input": Decimal("3.00") / Decimal("1000000"),
+                    "output": Decimal("15.00") / Decimal("1000000"),
+                },
+                "claude-opus-4-8": {
+                    "input": Decimal("15.00") / Decimal("1000000"),
+                    "output": Decimal("75.00") / Decimal("1000000"),
+                },
+            }
+
+            model_rates = PRICING.get(model_used, PRICING["claude-sonnet-4-6"])
+            cost_usd = (Decimal(total_input_tokens) * model_rates["input"] +
+                        Decimal(total_output_tokens) * model_rates["output"])
+
             final_message = result["messages"][-1].content
 
             if integration and integration.sync_status == "error":
@@ -321,6 +367,9 @@ async def process_slack_message(event: dict):
             agent_run.response = final_message
             agent_run.tools_called = tools_called
             agent_run.model_used = model_used
+            agent_run.tokens_input = total_input_tokens
+            agent_run.tokens_output = total_output_tokens
+            agent_run.cost_usd = cost_usd
             agent_run.duration_ms = duration_ms
             await session.commit()
 

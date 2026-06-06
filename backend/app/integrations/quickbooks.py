@@ -10,7 +10,6 @@ from quickbooks.exceptions import QuickbooksException
 
 from backend.app.config import get_settings
 from backend.app.models.integration import Integration
-from backend.app.models.tenant import Tenant
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -189,25 +188,8 @@ async def _fetch_report(realm_id: str, report_name: str, start_date: str, end_da
 
 
 async def _get_report_date_range(tenant_id: str, session: AsyncSession) -> tuple[str, str]:
-    from uuid import UUID
-    try:
-        t_id = UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id
-    except ValueError:
-        t_id = tenant_id
-
-    stmt = select(Tenant).where(Tenant.id == t_id)
-    result = await session.execute(stmt)
-    tenant = result.scalar_one_or_none()
-
     today = datetime.now(timezone.utc).date()
-    two_years_ago = today - timedelta(days=2 * 365)
-
-    if tenant and tenant.created_at:
-        tenant_created = tenant.created_at.date() if hasattr(tenant.created_at, "date") else tenant.created_at
-        start_date = min(tenant_created, two_years_ago)
-    else:
-        start_date = two_years_ago
-
+    start_date = today - timedelta(days=2 * 365)
     return start_date.isoformat(), today.isoformat()
 
 

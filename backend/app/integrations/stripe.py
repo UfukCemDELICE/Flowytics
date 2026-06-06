@@ -47,6 +47,10 @@ async def create_checkout_session(
         success_url=success_url,
         cancel_url=cancel_url,
         metadata={"clerk_org_id": clerk_org_id},
+        subscription_data={
+            "trial_period_days": 14,
+            "metadata": {"clerk_org_id": clerk_org_id}
+        },
     )
     return session.url or ""
 

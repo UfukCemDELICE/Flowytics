@@ -64,7 +64,7 @@ def call_model(state: AgentState) -> dict:
     # 2. Dynamic Injector (Save token bounds)
     recent_text = str([str(m.content) for m in messages[-3:]]).lower()
     
-    if any(k in recent_text for k in ["what if", "scenario", "hire", "fire"]):
+    if any(k in recent_text for k in ["what if", "scenario", "hire", "fire", "cut", "reduce", "drop", "%", "percent"]):
         system_text += "\n\n" + load_prompt("scenario.txt")
         
     if any(k in recent_text for k in ["anomaly", "spike", "unusual", "outlier"]):

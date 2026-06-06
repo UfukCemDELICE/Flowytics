@@ -55,7 +55,9 @@ class AnomalyResult(BaseModel):
 class ScenarioChange(BaseModel):
     type: Literal["hire", "fire", "revenue_change", "new_expense", "cut_expense"]
     description: str
-    monthly_impact: Decimal
+    monthly_impact: Decimal = Decimal("0")
+    pct_of_burn: Decimal | None = None   # signed fraction vs baseline net burn; -0.20 = 20% cut
+    pct_of_expenses: Decimal | None = None   # signed fraction vs baseline gross burn (expenses); -0.20 = 20% expense cut
 
 class ScenarioResult(BaseModel):
     current_runway: Decimal

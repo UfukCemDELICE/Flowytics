@@ -14,7 +14,15 @@ def calculate_scenario_impact(summary: FinancialSummary, changes: list[ScenarioC
     """
     # Guard: no financial data
     if not summary.monthly_financials:
-        total_impact = sum(c.monthly_impact for c in changes)
+        current_burn = Decimal("0")
+        gross_burn = Decimal("0")
+        total_impact = Decimal("0")
+        for change in changes:
+            total_impact += change.monthly_impact
+            if change.pct_of_burn is not None:
+                total_impact += current_burn * change.pct_of_burn
+            if change.pct_of_expenses is not None:
+                total_impact += -(gross_burn * abs(change.pct_of_expenses))
         cash = summary.current_cash_balance
         if total_impact <= Decimal("0"):
             new_runway = Decimal("9999")
@@ -43,6 +51,13 @@ def calculate_scenario_impact(summary: FinancialSummary, changes: list[ScenarioC
     new_burn = current_burn
     for change in changes:
         new_burn += change.monthly_impact
+        if change.pct_of_burn is not None:
+            change_impact = current_burn * change.pct_of_burn
+            new_burn += change_impact
+        if change.pct_of_expenses is not None:
+            gross_burn = base_burn.gross_burn_monthly
+            change_impact = -(gross_burn * abs(change.pct_of_expenses))
+            new_burn += change_impact
 
     # 3. Simulate new projected runway
     cash = summary.current_cash_balance

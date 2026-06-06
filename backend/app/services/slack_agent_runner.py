@@ -1,6 +1,5 @@
 from backend.app.config import settings
 import logging
-import uuid
 import re
 from datetime import datetime, timezone, timedelta
 from sqlmodel import select
@@ -156,6 +155,51 @@ async def process_slack_message(event: dict):
 
         await session.refresh(agent_run)
 
+        # Part A — Load conversation history
+        is_threaded = event.get("thread_ts") is not None and event.get("thread_ts") != ts
+        if is_threaded:
+            history_stmt = (
+                select(SlackMessage)
+                .where(
+                    SlackMessage.tenant_id == tenant.id,
+                    SlackMessage.slack_channel_id == channel,
+                    SlackMessage.slack_thread_ts == thread_ts,
+                    SlackMessage.id != in_msg.id
+                )
+            )
+        else:
+            now_val = utc_now()
+            from sqlalchemy import or_, and_
+            history_stmt = (
+                select(SlackMessage)
+                .where(
+                    SlackMessage.tenant_id == tenant.id,
+                    SlackMessage.slack_channel_id == channel,
+                    SlackMessage.created_at >= now_val - timedelta(minutes=30),
+                    SlackMessage.id != in_msg.id,
+                    or_(
+                        and_(SlackMessage.direction == "inbound", SlackMessage.slack_user_id == user_id),
+                        SlackMessage.direction == "outbound"
+                    )
+                )
+            )
+
+        history_stmt = history_stmt.order_by(SlackMessage.created_at.desc()).limit(6)
+        history_res = await session.execute(history_stmt)
+        history_rows = history_res.scalars().all()
+
+        # Present chronologically (ascending)
+        history_rows.reverse()
+
+        history_tuples = []
+        for msg in history_rows:
+            content = msg.content or ""
+            if msg.direction == "inbound":
+                clean_content = re.sub(r'<@[A-Z0-9]+>', '', content).strip()
+                history_tuples.append(("user", clean_content))
+            elif msg.direction == "outbound":
+                history_tuples.append(("assistant", content))
+
         # Fetch QBO snapshots and build financial summary
         pl_stmt = select(FinancialSnapshot).where(
             FinancialSnapshot.tenant_id == tenant.id,
@@ -213,7 +257,7 @@ async def process_slack_message(event: dict):
             )
 
             inputs = {
-                "messages": [("user", clean_text)],
+                "messages": [*history_tuples, ("user", clean_text)],
                 "financial_summary": financial_summary
             }
             result = await agent_app.ainvoke(inputs)

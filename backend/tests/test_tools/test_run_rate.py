@@ -87,3 +87,17 @@ def test_run_rate_zero_months():
     assert isinstance(result.volatility_ratio, Decimal)
     assert isinstance(result.min_revenue, Decimal)
     assert isinstance(result.max_revenue, Decimal)
+
+def test_run_rate_excludes_trailing_zero_revenue_month():
+    # Dec/Jan/Feb have revenue; Mar booked with 0 revenue must be excluded
+    months = [
+        MonthlyFinancial(month_start=date(2025,12,1), total_revenue=Decimal("1018.00"),  total_expenses=Decimal("0"), net_income=Decimal("0")),
+        MonthlyFinancial(month_start=date(2026,1,1),  total_revenue=Decimal("4054.14"), total_expenses=Decimal("0"), net_income=Decimal("0")),
+        MonthlyFinancial(month_start=date(2026,2,1),  total_revenue=Decimal("4372.38"), total_expenses=Decimal("0"), net_income=Decimal("0")),
+        MonthlyFinancial(month_start=date(2026,3,1),  total_revenue=Decimal("0"),       total_expenses=Decimal("500.00"), net_income=Decimal("-500.00")),
+    ]
+    summary = FinancialSummary(current_cash_balance=Decimal("0"), monthly_financials=months)
+    result = calculate_run_rate.invoke({"summary": summary})
+    assert result.run_rate == Decimal("37778.08")   # Dec/Jan/Feb, NOT including Mar
+    assert result.min_revenue > 0                    # no zero-revenue month selected
+

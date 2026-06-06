@@ -7,10 +7,11 @@ def calculate_run_rate(summary: FinancialSummary) -> RunRateResult:
     """
     Calculates the annualized run rate (ARR proxy) based on the most recent 3 months of populated revenue data.
     """
-    financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
+    sorted_financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
+    revenue_months = [m for m in sorted_financials if m.total_revenue > 0]
     
-    # Take the last 3 entries
-    selected_months = financials[-3:]
+    # Take the last 3 entries of revenue_months
+    selected_months = revenue_months[-3:]
     count = len(selected_months)
 
     if count == 0:

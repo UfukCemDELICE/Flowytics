@@ -9,6 +9,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from backend.app.api.v1 import me, quickbooks, stripe, slack
 from backend.app.services.proactive_alerts import run_proactive_alerts
 from backend.app.services.monthly_report import run_monthly_reports
+from backend.app.services.sync import run_daily_qbo_sync
+from backend.app.services.computed_metrics import run_daily_computed_metrics
 from backend.app.logging_config import setup_logging
 from backend.app.middleware import CorrelationIDMiddleware, SecurityHeadersMiddleware
 from backend.app.config import get_settings
@@ -19,6 +21,8 @@ scheduler = AsyncIOScheduler()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup: Initialize logging first, then scheduler
     setup_logging()
+    scheduler.add_job(run_daily_qbo_sync, 'cron', hour=2, minute=0)
+    scheduler.add_job(run_daily_computed_metrics, 'cron', hour=3, minute=0)
     scheduler.add_job(run_proactive_alerts, 'cron', hour=9, minute=0)
     scheduler.add_job(run_monthly_reports, 'cron', day=1, hour=9, minute=0)
     scheduler.start()

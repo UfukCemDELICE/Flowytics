@@ -8,6 +8,7 @@ from sqlalchemy import delete
 from backend.app.models.integration import Integration
 from backend.app.models.financial_snapshot import FinancialSnapshot
 from backend.app.models.tenant import Tenant
+from backend.app.database import _get_engine
 from backend.app.integrations.quickbooks import (
     get_profit_and_loss,
     get_balance_sheet,
@@ -130,3 +131,44 @@ async def sync_tenant(tenant_id: str, session: AsyncSession) -> dict:
         integration.error_message = str(e)
         await session.commit()
         raise
+
+
+async def run_daily_qbo_sync() -> None:
+    """Runs daily QBO sync for all tenants with active integrations."""
+    logger.info("Starting scheduled daily QBO sync job.")
+    
+    _, session_factory = _get_engine()
+    
+    # 1. Fetch all active or errored QBO integration tenant IDs
+    async with session_factory() as session:
+        stmt = select(Integration).where(
+            Integration.provider == "quickbooks",
+            Integration.sync_status.in_(["active", "error"])
+        )
+        res = await session.execute(stmt)
+        integrations = res.scalars().all()
+        tenant_ids = [str(integration.tenant_id) for integration in integrations]
+        
+    logger.info(f"Found {len(tenant_ids)} active/errored QBO integration(s) to sync.")
+    
+    # 2. Sync each tenant in a separate session/transaction
+    success_count = 0
+    failure_count = 0
+    
+    for tenant_id in tenant_ids:
+        logger.info(f"Starting QBO sync for tenant {tenant_id}")
+        try:
+            async with session_factory() as session:
+                await sync_tenant(tenant_id, session)
+            logger.info(f"Successfully synced QBO for tenant {tenant_id}")
+            success_count += 1
+        except Exception as e:
+            logger.error(
+                f"Failed to sync QBO for tenant {tenant_id}: {e}",
+                extra={"tenant_id": tenant_id, "error": str(e)},
+                exc_info=True
+            )
+            failure_count += 1
+            
+    logger.info(f"Daily QBO sync job completed. Successes: {success_count}, Failures: {failure_count}")
+

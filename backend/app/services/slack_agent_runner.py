@@ -113,13 +113,48 @@ async def process_slack_message(event: dict):
         u_res = await session.execute(user_map_stmt)
         slack_map = u_res.scalar_one_or_none()
 
-        if not slack_map:
-            slack_map = SlackUserMap(
-                tenant_id=tenant.id,
-                slack_user_id=user_id,
-                slack_team_id=team_id
-            )
-            session.add(slack_map)
+        if not slack_map or not slack_map.clerk_user_id:
+            clerk_user_id = slack_map.clerk_user_id if slack_map else None
+            if not clerk_user_id and isinstance(user_id, str):
+                try:
+                    # 1. Fetch user info from Slack API
+                    res = await client.client.users_info(user=user_id)
+                    if res.get("ok"):
+                        user_info = res.get("user") or {}
+                        profile = user_info.get("profile") or {}
+                        email = profile.get("email")
+                        
+                        # 2. Look up Clerk user by email
+                        if isinstance(email, str):
+                            import httpx
+                            async with httpx.AsyncClient() as http_client:
+                                clerk_res = await http_client.get(
+                                    "https://api.clerk.com/v1/users",
+                                    params={"email_address": email},
+                                    headers={"Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"},
+                                    timeout=5.0
+                                )
+                                if clerk_res.status_code == 200:
+                                    clerk_users = clerk_res.json()
+                                    if clerk_users and isinstance(clerk_users, list):
+                                        clerk_user_id = clerk_users[0].get("id")
+                except Exception as e:
+                    logger.warning(
+                        f"Could not resolve Clerk user ID for Slack user {user_id}: {e}",
+                        exc_info=True
+                    )
+
+            if not slack_map:
+                slack_map = SlackUserMap(
+                    tenant_id=tenant.id,
+                    slack_user_id=user_id or "",
+                    slack_team_id=team_id or "",
+                    clerk_user_id=clerk_user_id
+                )
+                session.add(slack_map)
+            else:
+                slack_map.clerk_user_id = clerk_user_id
+                session.add(slack_map)
 
         agent_run = AgentRun(
             tenant_id=tenant.id,

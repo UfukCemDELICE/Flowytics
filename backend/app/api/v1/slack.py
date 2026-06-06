@@ -101,7 +101,11 @@ from starlette.responses import Response
 async def slack_install(user: dict = Depends(get_current_user)):
     settings = get_settings()
     client_id = settings.SLACK_CLIENT_ID
-    state = jwt.encode({"org_id": user["org_id"]}, settings.CLERK_SECRET_KEY[:32], algorithm="HS256")
+    state = jwt.encode(
+        {"org_id": user["org_id"], "clerk_user_id": user["user_id"]},
+        settings.CLERK_SECRET_KEY[:32],
+        algorithm="HS256"
+    )
     scopes = "chat:write,app_mentions:read,channels:history,groups:history,im:history"
     redirect_uri = settings.SLACK_REDIRECT_URI
     slack_url = (
@@ -124,6 +128,7 @@ async def oauth_redirect(
     try:
         payload = jwt.decode(state, settings.CLERK_SECRET_KEY[:32], algorithms=["HS256"])
         org_id = payload.get("org_id")
+        clerk_user_id = payload.get("clerk_user_id")
         if not org_id:
             raise ValueError("org_id missing")
     except Exception as e:
@@ -138,7 +143,9 @@ async def oauth_redirect(
             code=code,
             redirect_uri = settings.SLACK_REDIRECT_URI 
         )
-        team_id = response.get("team", {}).get("id")
+        team_id = response.get("team", {}).get("id")  # type: ignore
+        incoming_webhook = response.get("incoming_webhook") or {}  # type: ignore
+        channel_id = incoming_webhook.get("channel_id")  # type: ignore
         
         # We don't save the bot token currently (assuming single global workspace for MVP)
         # We just map the team_id to the tenant
@@ -148,8 +155,32 @@ async def oauth_redirect(
         
         if tenant:
             tenant.slack_team_id = team_id
+            if channel_id:
+                tenant.slack_channel_id = channel_id
             session.add(tenant)
             await session.commit()
+            
+            # Map authorizing Slack user to Clerk user ID
+            authed_user_id = response.get("authed_user", {}).get("id")  # type: ignore
+            if authed_user_id and clerk_user_id:
+                from backend.app.models.slack_message import SlackUserMap
+                map_stmt = select(SlackUserMap).where(SlackUserMap.slack_user_id == authed_user_id)
+                map_res = await session.execute(map_stmt)
+                slack_map = map_res.scalar_one_or_none()
+                if slack_map:
+                    slack_map.clerk_user_id = clerk_user_id
+                    slack_map.tenant_id = tenant.id
+                    session.add(slack_map)
+                else:
+                    slack_map = SlackUserMap(
+                        tenant_id=tenant.id,
+                        clerk_user_id=clerk_user_id,
+                        slack_user_id=authed_user_id,
+                        slack_team_id=team_id  # type: ignore
+                    )
+                    session.add(slack_map)
+                await session.commit()
+                
             # Check if all onboarding milestones are met → send welcome
             asyncio.create_task(_background_welcome_check(str(tenant.id)))
             
@@ -199,7 +230,6 @@ async def slack_events(request: Request) -> Response:
     logger.info(f"Slack raw body: {body[:500]}")
     
     import json
-    import os
     try:
         body_dict = json.loads(body)
         event = body_dict.get("event", {})

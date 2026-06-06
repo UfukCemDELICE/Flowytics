@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from typing import Mapping
 from backend.app.config import get_settings
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -86,6 +87,23 @@ async def stripe_webhook(
             customer_id = session.get("customer")
             subscription_id = session.get("subscription")
             
+            trial_started_at = None
+            trial_ends_at = None
+            if subscription_id:
+                try:
+                    from backend.app.integrations.stripe import _setup_stripe
+                    import stripe
+                    _setup_stripe()
+                    sub = stripe.Subscription.retrieve(subscription_id)
+                    trial_start = sub.get("trial_start")
+                    trial_end = sub.get("trial_end")
+                    if trial_start is not None:
+                        trial_started_at = datetime.fromtimestamp(trial_start, tz=timezone.utc)
+                    if trial_end is not None:
+                        trial_ends_at = datetime.fromtimestamp(trial_end, tz=timezone.utc)
+                except Exception as e:
+                    logger.error(f"Failed to fetch stripe subscription: {e}")
+            
             if clerk_org_id:
                 # Find the tenant
                 stmt = select(Tenant).where(Tenant.clerk_org_id == clerk_org_id)
@@ -96,6 +114,10 @@ async def stripe_webhook(
                     tenant.stripe_customer_id = customer_id
                     tenant.stripe_subscription_id = subscription_id
                     tenant.subscription_status = "active"
+                    if trial_started_at is not None:
+                        tenant.trial_started_at = trial_started_at
+                    if trial_ends_at is not None:
+                        tenant.trial_ends_at = trial_ends_at
                     db.add(tenant)
                     await db.commit()
                 else:
@@ -122,6 +144,19 @@ async def stripe_webhook(
             
             if tenant:
                 tenant.subscription_status = mapped_status
+                
+                # Extract trial start/end
+                trial_start = subscription.get("trial_start")
+                trial_end = subscription.get("trial_end")
+                if trial_start is not None:
+                    tenant.trial_started_at = datetime.fromtimestamp(trial_start, tz=timezone.utc)
+                else:
+                    tenant.trial_started_at = None
+                if trial_end is not None:
+                    tenant.trial_ends_at = datetime.fromtimestamp(trial_end, tz=timezone.utc)
+                else:
+                    tenant.trial_ends_at = None
+                    
                 db.add(tenant)
                 await db.commit()
 

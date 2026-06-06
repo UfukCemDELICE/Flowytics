@@ -21,6 +21,25 @@ router = APIRouter(prefix="/slack", tags=["slack"])
 logger = logging.getLogger(__name__)
 
 
+def _mask_sensitive_data(data):
+    """Recursively mask sensitive keys in a dictionary or list."""
+    if isinstance(data, dict):
+        masked = {}
+        for k, v in data.items():
+            if k in ("access_token", "refresh_token"):
+                masked[k] = "***MASKED***"
+            elif k == "url" and isinstance(v, str) and "hooks.slack.com/services/" in v:
+                masked[k] = "***MASKED_WEBHOOK_URL***"
+            elif isinstance(v, (dict, list)):
+                masked[k] = _mask_sensitive_data(v)
+            else:
+                masked[k] = v
+        return masked
+    elif isinstance(data, list):
+        return [_mask_sensitive_data(item) for item in data]
+    return data
+
+
 async def _background_welcome_check(tenant_id: str):
     """Background task: check if welcome message should be sent after Slack connect."""
     from backend.app.database import _get_engine
@@ -76,6 +95,18 @@ async def _background_member_joined_handler(team_id: str, channel_id: str):
             if not tenant_id:
                 logger.warning(f"member_joined_channel: No tenant found for slack_team_id {team_id}")
                 return
+            
+            # Update the tenant's slack_channel_id with the joined channel_id
+            tenant_stmt = select(Tenant).where(Tenant.id == tenant_id)
+            tenant_res = await session.execute(tenant_stmt)
+            tenant = tenant_res.scalar_one_or_none()
+            if tenant:
+                tenant.slack_channel_id = channel_id
+                session.add(tenant)
+                await session.commit()
+                logger.info(f"Updated tenant {tenant_id} slack_channel_id to {channel_id} inside member_joined_channel handler")
+            else:
+                logger.warning(f"Tenant {tenant_id} not found when attempting to update slack_channel_id in member_joined_channel")
                 
             await send_channel_greeting(tenant_id, channel_id, session)
             
@@ -143,6 +174,14 @@ async def oauth_redirect(
             code=code,
             redirect_uri = settings.SLACK_REDIRECT_URI 
         )
+        # Convert response to dict for logging and mask sensitive fields
+        try:
+            resp_dict = response.data if hasattr(response, "data") and isinstance(response.data, dict) else dict(response)
+        except Exception:
+            resp_dict = getattr(response, "data", response)
+        
+        logger.info(f"Slack OAuth full response: {_mask_sensitive_data(resp_dict)}")
+
         team_id = response.get("team", {}).get("id")  # type: ignore
         incoming_webhook = response.get("incoming_webhook") or {}  # type: ignore
         channel_id = incoming_webhook.get("channel_id")  # type: ignore

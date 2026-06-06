@@ -67,6 +67,13 @@ async def stripe_webhook(
     db: AsyncSession = Depends(get_session)
 ) -> dict:
     payload = await request.body()
+    try:
+        import json
+        event_type = json.loads(payload).get("type", "unknown")
+    except Exception:
+        event_type = "unparseable"
+    logger.info(f"Stripe webhook received: {event_type}")
+
     sig_header = request.headers.get("stripe-signature", "")
     
     try:

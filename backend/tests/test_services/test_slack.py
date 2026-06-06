@@ -444,16 +444,30 @@ async def test_background_member_joined_handler_success():
         mock_welcome.assert_called_once()
         assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-001"
         assert mock_welcome.call_args[0][1] == "C12345"
+        
+        # Assert database was updated with the new channel ID
+        assert len(db.store.get("tenants", [])) == 1
+        assert db.store["tenants"][0].slack_channel_id == "C12345"
 
 
 @pytest.mark.asyncio
 async def test_background_member_joined_handler_integration_lookup():
     from unittest.mock import patch, AsyncMock, MagicMock
     from backend.app.api.v1.slack import _background_member_joined_handler
+    from backend.app.models.tenant import Tenant
     from backend.app.models.integration import Integration
     from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
 
     db = InMemoryDB()
+    
+    tenant = Tenant(
+        id="t-mock-welcome-002",
+        clerk_org_id="welcome_org_2",
+        name="Welcome Co 2",
+        subscription_status="active",
+        slack_team_id="T_MOCK_TEAM",
+    )
+    db.add(tenant)
     
     integration = Integration(
         id="int-mock-welcome-002",
@@ -477,6 +491,10 @@ async def test_background_member_joined_handler_integration_lookup():
         mock_welcome.assert_called_once()
         assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-002"
         assert mock_welcome.call_args[0][1] == "C12345"
+        
+        # Assert database was updated with the new channel ID
+        assert len(db.store.get("tenants", [])) == 1
+        assert db.store["tenants"][0].slack_channel_id == "C12345"
 
 
 @pytest.mark.asyncio
@@ -510,6 +528,10 @@ async def test_background_member_joined_handler_tenant_lookup():
         mock_welcome.assert_called_once()
         assert str(mock_welcome.call_args[0][0]) == "t-mock-welcome-003"
         assert mock_welcome.call_args[0][1] == "C12345"
+        
+        # Assert database was updated with the new channel ID
+        assert len(db.store.get("tenants", [])) == 1
+        assert db.store["tenants"][0].slack_channel_id == "C12345"
 
 
 @pytest.mark.asyncio
@@ -831,3 +853,45 @@ async def test_slack_routing_and_deduplication_all_cases():
         # There should be exactly 4 outbound Slack messages
         outbound_msgs = [m for m in slack_msgs if m.direction == "outbound"]
         assert len(outbound_msgs) == 4
+
+
+def test_mask_sensitive_data():
+    from backend.app.api.v1.slack import _mask_sensitive_data
+    
+    raw = {
+        "ok": True,
+        "access_token": "xoxb-123456-abcdef",
+        "refresh_token": "xoxr-123456-abcdef",
+        "team": {
+            "id": "T123",
+            "name": "My Team"
+        },
+        "incoming_webhook": {
+            "channel": "#general",
+            "channel_id": "C123",
+            "url": "https://hooks.slack.com/services/T123/B123/xyz"
+        },
+        "authed_user": {
+            "id": "U123",
+            "access_token": "xoxp-user-token",
+            "refresh_token": "xoxr-user-token"
+        },
+        "nested_list": [
+            {"access_token": "secret_in_list"},
+            {"other_key": "safe_value"}
+        ]
+    }
+    
+    masked = _mask_sensitive_data(raw)
+    
+    assert masked["ok"] is True
+    assert masked["access_token"] == "***MASKED***"
+    assert masked["refresh_token"] == "***MASKED***"
+    assert masked["team"]["id"] == "T123"
+    assert masked["incoming_webhook"]["channel_id"] == "C123"
+    assert masked["incoming_webhook"]["url"] == "***MASKED_WEBHOOK_URL***"
+    assert masked["authed_user"]["id"] == "U123"
+    assert masked["authed_user"]["access_token"] == "***MASKED***"
+    assert masked["authed_user"]["refresh_token"] == "***MASKED***"
+    assert masked["nested_list"][0]["access_token"] == "***MASKED***"
+    assert masked["nested_list"][1]["other_key"] == "safe_value"

@@ -14,6 +14,7 @@ from backend.app.models.agent_run import AgentRun
 from backend.app.integrations.slack import SlackClient
 from backend.app.integrations.quickbooks import TokenExpiredError, IntegrationError
 from backend.app.agent.graph import app as agent_app
+from backend.app.utils import clean_unicode_minus
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +215,7 @@ async def process_slack_message(event: dict):
         bs_snap = (await session.execute(bs_stmt)).scalar_one_or_none()
 
         if not pl_snap or not bs_snap:
-            error_msg = "Please connect your QuickBooks account first."
+            error_msg = clean_unicode_minus("Please connect your QuickBooks account first.")
             error_blocks = client.format_error_block(
                 title="Connection Required",
                 message=error_msg,
@@ -222,11 +223,14 @@ async def process_slack_message(event: dict):
             )
             await client.send_reply(channel, thread_ts, error_msg, blocks=error_blocks)
             agent_run.is_successful = False
+            agent_run.status = "failed"
             agent_run.error_message = error_msg
             await session.commit()
             return
 
         warning_msg, should_block = await _check_qbo_data_freshness(tenant.id, session)
+        if warning_msg:
+            warning_msg = clean_unicode_minus(warning_msg)
 
         if should_block:
             error_blocks = client.format_error_block(
@@ -236,6 +240,7 @@ async def process_slack_message(event: dict):
             )
             await client.send_reply(channel, thread_ts, warning_msg, blocks=error_blocks)
             agent_run.is_successful = False
+            agent_run.status = "failed"
             agent_run.error_message = warning_msg
             await session.commit()
             return
@@ -284,6 +289,8 @@ async def process_slack_message(event: dict):
                 final_message = f"{sync_warning}\n\n{final_message}"
                 warning_msg = None
 
+            final_message = clean_unicode_minus(final_message)
+
             response_blocks = []
 
             if warning_msg:
@@ -293,7 +300,7 @@ async def process_slack_message(event: dict):
 
             fallback = f"{warning_msg}\n\n{final_message}" if warning_msg else final_message
 
-            await client.send_reply(channel, thread_ts, text=fallback, blocks=response_blocks)
+            outbound_ts = await client.send_reply(channel, thread_ts, text=fallback, blocks=response_blocks)
 
             out_msg = SlackMessage(
                 tenant_id=tenant.id,
@@ -301,7 +308,7 @@ async def process_slack_message(event: dict):
                 slack_channel_id=channel,
                 slack_thread_ts=thread_ts,
                 slack_user_id=None,
-                slack_ts=None,
+                slack_ts=outbound_ts if isinstance(outbound_ts, str) else None,
                 direction="outbound",
                 content=final_message,
                 is_bot=True,
@@ -324,16 +331,17 @@ async def process_slack_message(event: dict):
                 extra={"tenant_id": tenant.id, "error_type": type(e).__name__, "provider": "quickbooks"},
                 exc_info=True,
             )
+            error_msg_str = clean_unicode_minus(str(e))
             error_blocks = client.format_error_block(
                 title="QuickBooks Connection Problem",
-                message=f"*Details:* {str(e)}",
+                message=f"*Details:* {error_msg_str}",
                 cta=f"<{settings.FRONTEND_URL}/onboarding/accounting|Reconnect QuickBooks>",
             )
-            error_text = f"⚠️ QuickBooks connection error: {str(e)}"
+            error_text = clean_unicode_minus(f"⚠️ QuickBooks connection error: {error_msg_str}")
             await client.send_reply(channel, thread_ts, error_text, blocks=error_blocks)
             agent_run.is_successful = False
             agent_run.status = "failed"
-            agent_run.error_message = str(e)
+            agent_run.error_message = error_msg_str
             agent_run.duration_ms = duration_ms
             await session.commit()
 
@@ -344,6 +352,7 @@ async def process_slack_message(event: dict):
                 extra={"tenant_id": tenant.id, "error_type": type(e).__name__, "service": "langgraph"},
                 exc_info=True,
             )
+            error_msg_str = clean_unicode_minus(str(e))
             error_blocks = client.format_error_block(
                 title="Processing Error",
                 message="I encountered an error processing your request. Please try again later.",
@@ -351,6 +360,6 @@ async def process_slack_message(event: dict):
             await client.send_reply(channel, thread_ts, "Processing error — please try again.", blocks=error_blocks)
             agent_run.is_successful = False
             agent_run.status = "failed"
-            agent_run.error_message = str(e)
+            agent_run.error_message = error_msg_str
             agent_run.duration_ms = duration_ms
             await session.commit()

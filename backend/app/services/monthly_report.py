@@ -11,6 +11,7 @@ from backend.app.models.financial_snapshot import FinancialSnapshot
 from backend.app.models.computed_metric import ComputedMetric
 from backend.app.models.agent_run import AgentRun
 from backend.app.integrations.slack import SlackClient
+from backend.app.utils import clean_unicode_minus
 
 from backend.app.tools.financial_summary import parse_qbo_to_financial_summary
 from backend.app.tools.monthly_report import generate_monthly_report_data, MonthlyReportData
@@ -91,6 +92,9 @@ async def run_monthly_reports(tenant_id: int | None = None):
                     executive_summary = response.content
                     key_consideration = "Review full dashboard for details."
 
+                executive_summary = clean_unicode_minus(executive_summary)
+                key_consideration = clean_unicode_minus(key_consideration)
+
                 # 4. Format Slack display UI
                 ui_metrics = {
                     "mrr": report_data.fundraising.metrics.mrr,
@@ -99,6 +103,7 @@ async def run_monthly_reports(tenant_id: int | None = None):
                     "runway_months": report_data.runway.runway_months,
                     "cash_balance": report_data.raw_summary.current_cash_balance
                 }
+                ui_metrics = clean_unicode_minus(ui_metrics)
                 
                 blocks = slack_client.format_monthly_cfo_report_block(
                     metrics=ui_metrics,
@@ -129,7 +134,7 @@ async def run_monthly_reports(tenant_id: int | None = None):
                 
                 # 6. Dispatch
                 channel = tenant.slack_channel_id or "#general"
-                fallback_text = f"Monthly CFO Report: Runway is {ui_metrics['runway_months']} months."
+                fallback_text = clean_unicode_minus(f"Monthly CFO Report: Runway is {ui_metrics['runway_months']} months.")
                 
                 success = await slack_client.send_message(channel, fallback_text, blocks=blocks)
                 if success:

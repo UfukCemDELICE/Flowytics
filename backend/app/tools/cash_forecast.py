@@ -3,6 +3,8 @@ from decimal import Decimal
 from langchain_core.tools import tool
 from backend.app.tools.schemas import FinancialSummary, CashForecastResult, WeekProjection
 
+from backend.app.utils import clean_unicode_minus
+
 @tool
 def calculate_cash_forecast(summary: FinancialSummary) -> CashForecastResult:
     """
@@ -12,7 +14,7 @@ def calculate_cash_forecast(summary: FinancialSummary) -> CashForecastResult:
     financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
     if not financials:
         # Provide flat zero forecast if no data
-        return CashForecastResult(weeks=[], zero_cash_week=None)
+        return clean_unicode_minus(CashForecastResult(weeks=[], zero_cash_week=None))
 
     # Use the last 3 months to configure a baseline weekly rate
     recent = financials[-3:] if len(financials) >= 3 else financials
@@ -53,7 +55,7 @@ def calculate_cash_forecast(summary: FinancialSummary) -> CashForecastResult:
         
         current_date += timedelta(days=7)
 
-    return CashForecastResult(
+    return clean_unicode_minus(CashForecastResult(
         weeks=weeks,
         zero_cash_week=zero_cash_week
-    )
+    ))

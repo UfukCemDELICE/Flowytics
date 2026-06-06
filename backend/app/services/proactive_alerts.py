@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from sqlmodel import select
-from backend.app.utils import utc_now
+from backend.app.utils import utc_now, clean_unicode_minus
 
 from backend.app.database import _get_engine
 from backend.app.models.tenant import Tenant
@@ -142,6 +142,7 @@ async def run_proactive_alerts():
                     channel = tenant.slack_channel_id or "#general"
                     
                     alert_text = "The CFO AI has detected the following critical financial conditions:\n" + "\n".join(alerts)
+                    alert_text = clean_unicode_minus(alert_text)
                     blocks = client.format_proactive_alert_block(alert_text, severity="critical")
                     
                     # For demo / early MVP, just try logging if we don't have the exact channel hook.

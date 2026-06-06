@@ -24,6 +24,8 @@ class MonthlyReportData(BaseModel):
     anomalies: AnomalyResult
     fundraising: FundraisingResult
 
+from backend.app.utils import clean_unicode_minus
+
 @tool
 def generate_monthly_report_data(summary: FinancialSummary) -> MonthlyReportData:
     """
@@ -36,11 +38,11 @@ def generate_monthly_report_data(summary: FinancialSummary) -> MonthlyReportData
     anomalies = calculate_anomalies.invoke({"summary": summary})
     fundraising = calculate_fundraising_readiness.invoke({"summary": summary})
     
-    return MonthlyReportData(
+    return clean_unicode_minus(MonthlyReportData(
         raw_summary=summary,
         burn=burn,
         runway=runway,
         forecast=forecast,
         anomalies=anomalies,
         fundraising=fundraising
-    )
+    ))

@@ -99,31 +99,31 @@ class SlackClient:
     def __init__(self) -> None:
         self.client = slack_app.client
 
-    async def send_message(self, channel: str, text: str, blocks: list = None) -> bool:
+    async def send_message(self, channel: str, text: str, blocks: list = None) -> str | None:
         """Send a message to a Slack channel or DM."""
         try:
-            await self.client.chat_postMessage(channel=channel, text=text, blocks=blocks)
-            return True
+            res = await self.client.chat_postMessage(channel=channel, text=text, blocks=blocks)
+            return res.get("ts") if res else None
         except SlackApiError as e:
             logger.error(
                 "Error sending Slack message",
                 extra={"event": "slack_send_failed", "error_type": e.response["error"]},
             )
-            return False
+            return None
 
-    async def send_reply(self, channel: str, thread_ts: str, text: str, blocks: list = None) -> bool:
+    async def send_reply(self, channel: str, thread_ts: str, text: str, blocks: list = None) -> str | None:
         """Reply in a Slack thread."""
         try:
-            await self.client.chat_postMessage(
+            res = await self.client.chat_postMessage(
                 channel=channel, thread_ts=thread_ts, text=text, blocks=blocks
             )
-            return True
+            return res.get("ts") if res else None
         except SlackApiError as e:
             logger.error(
                 "Error sending Slack reply",
                 extra={"event": "slack_reply_failed", "error_type": e.response["error"]},
             )
-            return False
+            return None
 
     # ── CFO Response Formatting ─────────────────────────────────
 

@@ -2,6 +2,8 @@ from decimal import Decimal
 from langchain_core.tools import tool
 from backend.app.tools.schemas import FinancialSummary, RunRateResult, RunRateMonth
 
+from backend.app.utils import clean_unicode_minus
+
 @tool
 def calculate_run_rate(summary: FinancialSummary) -> RunRateResult:
     """
@@ -15,7 +17,7 @@ def calculate_run_rate(summary: FinancialSummary) -> RunRateResult:
     count = len(selected_months)
 
     if count == 0:
-        return RunRateResult(
+        return clean_unicode_minus(RunRateResult(
             run_rate=None,
             months_used=[],
             month_count=0,
@@ -25,7 +27,7 @@ def calculate_run_rate(summary: FinancialSummary) -> RunRateResult:
             min_revenue=Decimal("0"),
             max_revenue=Decimal("0"),
             caveat="No revenue data is available to calculate a run rate."
-        )
+        ))
 
     low_confidence = (count < 3)
 
@@ -59,7 +61,7 @@ def calculate_run_rate(summary: FinancialSummary) -> RunRateResult:
         for m in selected_months
     ]
 
-    return RunRateResult(
+    return clean_unicode_minus(RunRateResult(
         run_rate=run_rate,
         months_used=months_used,
         month_count=count,
@@ -69,4 +71,4 @@ def calculate_run_rate(summary: FinancialSummary) -> RunRateResult:
         min_revenue=min_rev,
         max_revenue=max_rev,
         caveat=caveat
-    )
+    ))

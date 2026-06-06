@@ -4,6 +4,8 @@ from backend.app.tools.schemas import FinancialSummary, FundraisingResult, Fundr
 from backend.app.tools.burn_rate import calculate_burn_rate
 from backend.app.tools.runway import calculate_runway
 
+from backend.app.utils import clean_unicode_minus
+
 @tool
 def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingResult:
     """
@@ -12,11 +14,11 @@ def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingRes
     """
     financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
     if not financials:
-        return FundraisingResult(
+        return clean_unicode_minus(FundraisingResult(
             readiness_score=0, 
             metrics=FundraisingMetrics(mrr=None, mrr_growth_rate=None, arr=None, burn_multiple=None, runway_months=Decimal("0"), gross_margin=None), 
             gaps=["No financial history found."]
-        )
+        ))
 
     recent = financials[-1]
     prev = financials[-2] if len(financials) > 1 else None
@@ -77,7 +79,7 @@ def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingRes
     else:
         gaps.append("Pre-revenue startups face harder hurdles; focus firmly on product-market validation and runway conservation.")
 
-    return FundraisingResult(
+    return clean_unicode_minus(FundraisingResult(
         readiness_score=score,
         metrics=FundraisingMetrics(
             mrr=mrr,
@@ -88,4 +90,4 @@ def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingRes
             gross_margin=None # MVP excludes COGS from raw QBO mappings
         ),
         gaps=gaps
-    )
+    ))

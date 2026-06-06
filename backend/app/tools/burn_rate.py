@@ -3,6 +3,8 @@ from decimal import Decimal
 from langchain_core.tools import tool
 from backend.app.tools.schemas import BurnRateResult, FinancialSummary
 
+from backend.app.utils import clean_unicode_minus
+
 @tool
 def calculate_burn_rate(summary: FinancialSummary) -> BurnRateResult:
     """
@@ -14,14 +16,14 @@ def calculate_burn_rate(summary: FinancialSummary) -> BurnRateResult:
     n = len(financials)
     
     if n == 0:
-        return BurnRateResult(
+        return clean_unicode_minus(BurnRateResult(
             net_burn_monthly=Decimal("0"),
             gross_burn_monthly=Decimal("0"),
             burn_multiple=None,
             trend="stable",
             trend_slope=Decimal("0"),
             period_months=0
-        )
+        ))
 
     # Weighted average: more recent months carry higher weight (e.g., exponential or linear decay)
     # Let's use linear weights: 1, 2, 3...
@@ -84,11 +86,11 @@ def calculate_burn_rate(summary: FinancialSummary) -> BurnRateResult:
     # Burn multiple = net burn / net new ARR. We skip ARR logic for now unless there's an easy way.
     # SaaS metric, leaving as None.
     
-    return BurnRateResult(
+    return clean_unicode_minus(BurnRateResult(
         net_burn_monthly=net_burn_monthly,
         gross_burn_monthly=gross_burn_monthly,
         burn_multiple=None,
         trend=trend,
         trend_slope=slope,
         period_months=n
-    )
+    ))

@@ -4,6 +4,8 @@ from backend.app.tools.schemas import FinancialSummary, ScenarioChange, Scenario
 from backend.app.tools.burn_rate import calculate_burn_rate
 from backend.app.tools.runway import calculate_runway
 
+from backend.app.utils import clean_unicode_minus
+
 @tool
 def calculate_scenario_impact(summary: FinancialSummary, changes: list[ScenarioChange]) -> ScenarioResult:
     """
@@ -30,7 +32,7 @@ def calculate_scenario_impact(summary: FinancialSummary, changes: list[ScenarioC
             new_runway = Decimal("0")
         else:
             new_runway = (cash / total_impact).quantize(Decimal("0.01"))
-        return ScenarioResult(
+        return clean_unicode_minus(ScenarioResult(
             current_runway=Decimal("9999"),
             new_runway=new_runway,
             delta_runway=new_runway - Decimal("9999"),
@@ -38,7 +40,7 @@ def calculate_scenario_impact(summary: FinancialSummary, changes: list[ScenarioC
             new_burn=total_impact,
             delta_burn=total_impact,
             changes_applied=changes,
-        )
+        ))
 
     # 1. Establish the baseline
     base_burn = calculate_burn_rate.invoke({"summary": summary})
@@ -70,7 +72,7 @@ def calculate_scenario_impact(summary: FinancialSummary, changes: list[ScenarioC
     delta_runway = new_runway_months - current_runway_months
     delta_burn = new_burn - current_burn
 
-    return ScenarioResult(
+    return clean_unicode_minus(ScenarioResult(
         current_runway=current_runway_months,
         new_runway=new_runway_months,
         delta_runway=delta_runway,
@@ -78,4 +80,4 @@ def calculate_scenario_impact(summary: FinancialSummary, changes: list[ScenarioC
         new_burn=new_burn,
         delta_burn=delta_burn,
         changes_applied=changes
-    )
+    ))

@@ -4,6 +4,8 @@ import statistics
 from langchain_core.tools import tool
 from backend.app.tools.schemas import FinancialSummary, AnomalyResult, Anomaly
 
+from backend.app.utils import clean_unicode_minus
+
 @tool
 def calculate_anomalies(summary: FinancialSummary) -> AnomalyResult:
     """
@@ -14,7 +16,7 @@ def calculate_anomalies(summary: FinancialSummary) -> AnomalyResult:
     financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
     if len(financials) < 3:
         # Cannot calculate Z-score reliably with fewer than 3 months of data
-        return AnomalyResult(anomalies=[], scan_period_months=len(financials))
+        return clean_unicode_minus(AnomalyResult(anomalies=[], scan_period_months=len(financials)))
 
     # Get the the target month to scan (the most recent month)
     target = financials[-1]
@@ -57,7 +59,7 @@ def calculate_anomalies(summary: FinancialSummary) -> AnomalyResult:
                 description=f"Expense category '{cat}' spiked to ${current_amount:,.2f} versus a historical average of ${mean:,.2f}."
             ))
 
-    return AnomalyResult(
+    return clean_unicode_minus(AnomalyResult(
         anomalies=anomalies,
         scan_period_months=len(financials)
-    )
+    ))

@@ -4,6 +4,8 @@ from dateutil.relativedelta import relativedelta
 from langchain_core.tools import tool
 from backend.app.tools.schemas import BurnRateResult, FinancialSummary, RunwayResult
 
+from backend.app.utils import clean_unicode_minus
+
 @tool
 def calculate_runway(summary: FinancialSummary, burn_rate: BurnRateResult) -> RunwayResult:
     """
@@ -13,23 +15,23 @@ def calculate_runway(summary: FinancialSummary, burn_rate: BurnRateResult) -> Ru
     net_burn = burn_rate.net_burn_monthly
 
     if net_burn <= Decimal("0"):
-        return RunwayResult(
+        return clean_unicode_minus(RunwayResult(
             runway_months=Decimal("9999"),
             cash_balance=cash,
             monthly_net_burn=net_burn,
             runway_status="healthy",
             cash_zero_date=None
-        )
+        ))
 
     # Negative cash = already past zero
     if cash <= Decimal("0"):
-        return RunwayResult(
+        return clean_unicode_minus(RunwayResult(
             runway_months=Decimal("0"),
             cash_balance=cash,
             monthly_net_burn=net_burn,
             runway_status="critical",
             cash_zero_date=date.today()
-        )
+        ))
 
     runway_months = cash / net_burn
     
@@ -54,10 +56,10 @@ def calculate_runway(summary: FinancialSummary, burn_rate: BurnRateResult) -> Ru
     # Handle float conversion precision issues if any, round to 2 decimal places
     runway_months = runway_months.quantize(Decimal("0.01"))
 
-    return RunwayResult(
+    return clean_unicode_minus(RunwayResult(
         runway_months=runway_months,
         cash_balance=cash,
         monthly_net_burn=net_burn,
         runway_status=status,
         cash_zero_date=zero_date
-    )
+    ))

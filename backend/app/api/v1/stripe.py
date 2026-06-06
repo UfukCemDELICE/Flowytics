@@ -66,6 +66,7 @@ async def stripe_webhook(
     request: Request,
     db: AsyncSession = Depends(get_session)
 ) -> dict:
+    logger.info("Stripe webhook handler entered")
     payload = await request.body()
     try:
         import json
@@ -90,6 +91,8 @@ async def stripe_webhook(
     try:
         if event_type == "checkout.session.completed":
             session = event["data"]["object"]
+            session_id = session.get("id")
+            logger.info(f"Processing checkout.session.completed for session: {session_id}")
             clerk_org_id = session.get("metadata", {}).get("clerk_org_id")
             customer_id = session.get("customer")
             subscription_id = session.get("subscription")

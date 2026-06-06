@@ -96,6 +96,7 @@ async def stripe_webhook(
             clerk_org_id = session.get("metadata", {}).get("clerk_org_id")
             customer_id = session.get("customer")
             subscription_id = session.get("subscription")
+            logger.info(f"checkout.session.completed: clerk_org_id={clerk_org_id}, subscription_id={session.get('subscription')}, customer_id={session.get('customer')}")
             
             trial_started_at = None
             trial_ends_at = None
@@ -105,6 +106,15 @@ async def stripe_webhook(
                     import stripe
                     _setup_stripe()
                     sub = stripe.Subscription.retrieve(subscription_id)
+                    class DictAttributeWrapper:
+                        def __init__(self, obj):
+                            self.obj = obj
+                        def __getattr__(self, name):
+                            if isinstance(self.obj, dict):
+                                return self.obj.get(name)
+                            return getattr(self.obj, name, None)
+                    subscription = DictAttributeWrapper(sub)
+                    logger.info(f"Stripe subscription trial_start={subscription.trial_start}, trial_end={subscription.trial_end}")
                     trial_start = sub.get("trial_start")
                     trial_end = sub.get("trial_end")
                     if trial_start is not None:
@@ -119,6 +129,7 @@ async def stripe_webhook(
                 stmt = select(Tenant).where(Tenant.clerk_org_id == clerk_org_id)
                 result = await db.execute(stmt)
                 tenant = result.scalar_one_or_none()
+                logger.info(f"Tenant lookup result: {tenant}")
                 
                 if tenant:
                     tenant.stripe_customer_id = customer_id
@@ -130,6 +141,7 @@ async def stripe_webhook(
                         tenant.trial_ends_at = trial_ends_at
                     db.add(tenant)
                     await db.commit()
+                    logger.info(f"Tenant updated successfully: trial_started_at={tenant.trial_started_at}, trial_ends_at={tenant.trial_ends_at}")
                 else:
                     logger.error(
                         "Tenant not found for Stripe checkout",

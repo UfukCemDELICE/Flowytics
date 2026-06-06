@@ -118,9 +118,9 @@ async def stripe_webhook(
                     trial_start = sub.get("trial_start")
                     trial_end = sub.get("trial_end")
                     if trial_start is not None:
-                        trial_started_at = datetime.fromtimestamp(trial_start, tz=timezone.utc)
+                        trial_started_at = datetime.utcfromtimestamp(trial_start)
                     if trial_end is not None:
-                        trial_ends_at = datetime.fromtimestamp(trial_end, tz=timezone.utc)
+                        trial_ends_at = datetime.utcfromtimestamp(trial_end)
                 except Exception as e:
                     logger.error(f"Failed to fetch stripe subscription: {e}")
             
@@ -171,11 +171,11 @@ async def stripe_webhook(
                 trial_start = subscription.get("trial_start")
                 trial_end = subscription.get("trial_end")
                 if trial_start is not None:
-                    tenant.trial_started_at = datetime.fromtimestamp(trial_start, tz=timezone.utc)
+                    tenant.trial_started_at = datetime.utcfromtimestamp(trial_start)
                 else:
                     tenant.trial_started_at = None
                 if trial_end is not None:
-                    tenant.trial_ends_at = datetime.fromtimestamp(trial_end, tz=timezone.utc)
+                    tenant.trial_ends_at = datetime.utcfromtimestamp(trial_end)
                 else:
                     tenant.trial_ends_at = None
                     

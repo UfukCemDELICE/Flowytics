@@ -179,8 +179,8 @@ async def test_stripe_webhook_checkout_session_completed_trial_dates():
         assert resp.status_code == 200
         
         # Assert trial dates updated
-        assert mock_tenant.trial_started_at == datetime.fromtimestamp(1700000000, tz=timezone.utc)
-        assert mock_tenant.trial_ends_at == datetime.fromtimestamp(1701000000, tz=timezone.utc)
+        assert mock_tenant.trial_started_at == datetime.utcfromtimestamp(1700000000)
+        assert mock_tenant.trial_ends_at == datetime.utcfromtimestamp(1701000000)
         assert mock_tenant.stripe_customer_id == "cus_12345"
         assert mock_tenant.stripe_subscription_id == "sub_12345"
         
@@ -226,8 +226,8 @@ async def test_stripe_webhook_customer_subscription_updated_trial_dates():
         assert resp.status_code == 200
         
         # Assert trial dates updated directly from the event data object
-        assert mock_tenant.trial_started_at == datetime.fromtimestamp(1702000000, tz=timezone.utc)
-        assert mock_tenant.trial_ends_at == datetime.fromtimestamp(1703000000, tz=timezone.utc)
+        assert mock_tenant.trial_started_at == datetime.utcfromtimestamp(1702000000)
+        assert mock_tenant.trial_ends_at == datetime.utcfromtimestamp(1703000000)
         
         del app.dependency_overrides[get_session]
 

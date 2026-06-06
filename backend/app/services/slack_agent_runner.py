@@ -82,6 +82,21 @@ async def process_slack_message(event: dict):
 
     _, session_factory = _get_engine()
     async with session_factory() as session:
+        # Check for duplicate processing (dedup by channel and ts)
+        if channel and ts:
+            dup_stmt = select(SlackMessage).where(
+                SlackMessage.slack_channel_id == channel,
+                SlackMessage.slack_ts == ts,
+                SlackMessage.direction == "inbound"
+            )
+            dup_res = await session.execute(dup_stmt)
+            if dup_res.scalar_one_or_none() is not None:
+                logger.info(
+                    "Duplicate Slack message detected via early query, ignoring",
+                    extra={"channel": channel, "ts": ts}
+                )
+                return
+
         stmt = select(Tenant).where(Tenant.slack_team_id == team_id)
         result = await session.execute(stmt)
         tenant = result.scalar_one_or_none()
@@ -127,7 +142,18 @@ async def process_slack_message(event: dict):
             agent_run_id=agent_run.id
         )
         session.add(in_msg)
-        await session.commit()
+        
+        from sqlalchemy.exc import IntegrityError
+        try:
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            logger.info(
+                "Duplicate Slack message caught by unique constraint, aborting",
+                extra={"channel": channel, "ts": ts}
+            )
+            return
+
         await session.refresh(agent_run)
 
         # Fetch QBO snapshots and build financial summary

@@ -185,14 +185,9 @@ async def handle_message_events(body: dict, say: callable, logger: logging.Logge
     if event.get("bot_id") or event.get("subtype") == "bot_message":
         return
         
-    channel = event.get("channel", "")
-    channel_type = event.get("channel_type")
-    
-    # Process only Direct Messages (IMs)
-    if channel_type == "im" or channel.startswith("D"):
-        if "team" not in event:
-            event["team"] = body.get("team_id")
-        asyncio.create_task(process_slack_message(event))
+    if "team" not in event:
+        event["team"] = body.get("team_id")
+    asyncio.create_task(process_slack_message(event))
 
 @router.post("/events")
 @router.post("/events/")

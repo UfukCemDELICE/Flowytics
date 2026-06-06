@@ -381,12 +381,12 @@ async def test_handle_message_events_ignore_bot():
 
 
 @pytest.mark.asyncio
-async def test_handle_message_events_ignore_non_im():
+async def test_handle_message_events_channel_dispatched():
     from unittest.mock import patch, AsyncMock, MagicMock
     import asyncio
     from backend.app.api.v1.slack import handle_message_events
 
-    # Message event in a public channel without mention
+    # Message event in a public channel
     body = {
         "team_id": "T_MOCK_TEAM",
         "event": {
@@ -402,7 +402,7 @@ async def test_handle_message_events_ignore_non_im():
     with patch("backend.app.api.v1.slack.process_slack_message", new_callable=AsyncMock) as mock_process:
         await handle_message_events(body, say=MagicMock(), logger=MagicMock())
         await asyncio.sleep(0.01)
-        mock_process.assert_not_called()
+        mock_process.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -572,3 +572,262 @@ async def test_slack_events_endpoint_member_joined_channel_mismatch():
         
         mock_safe_handler.assert_not_called()
         mock_bolt_handle.assert_called_once_with(mock_request)
+
+
+@pytest.mark.asyncio
+async def test_process_slack_message_duplicate_early_check():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    from backend.app.models.tenant import Tenant
+    from backend.app.models.slack_message import SlackMessage
+    from backend.app.services.slack_agent_runner import process_slack_message
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+
+    db = InMemoryDB()
+
+    # Setup pre-existing inbound message in DB
+    existing_msg = SlackMessage(
+        tenant_id="t-mock-001",
+        slack_team_id="T_MOCK_TEAM",
+        slack_channel_id="C_MOCK_CHANNEL",
+        slack_ts="12345.67",
+        direction="inbound",
+        content="hello bot"
+    )
+    db.add(existing_msg)
+    await db.commit()
+
+    slack_event = {
+        "team": "T_MOCK_TEAM",
+        "user": "U_MOCK_USER",
+        "channel": "C_MOCK_CHANNEL",
+        "text": "hello bot",
+        "ts": "12345.67",
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.services.slack_agent_runner._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.slack_agent_runner.agent_app.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+
+        await process_slack_message(slack_event)
+
+        # Early check returns, ainvoke should NOT be called
+        mock_ainvoke.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_slack_message_integrity_error():
+    from unittest.mock import patch, AsyncMock, MagicMock
+    from sqlalchemy.exc import IntegrityError
+    from backend.app.models.tenant import Tenant
+    from backend.app.services.slack_agent_runner import process_slack_message
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+
+    db = InMemoryDB()
+    tenant = Tenant(
+        id="t-mock-001",
+        clerk_org_id="mock_org",
+        name="Mock Co",
+        slack_team_id="T_MOCK_TEAM"
+    )
+    db.add(tenant)
+    await db.commit()
+
+    # Mock commit to raise IntegrityError
+    db.commit = AsyncMock(side_effect=IntegrityError("Duplicate key", params={}, orig=None))
+    db.rollback = AsyncMock()
+
+    slack_event = {
+        "team": "T_MOCK_TEAM",
+        "user": "U_MOCK_USER",
+        "channel": "C_MOCK_CHANNEL",
+        "text": "hello bot",
+        "ts": "12345.67",
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.services.slack_agent_runner._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.slack_agent_runner.agent_app.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+
+        await process_slack_message(slack_event)
+
+        # Should rollback, ainvoke should NOT be called
+        db.rollback.assert_called_once()
+        mock_ainvoke.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_slack_routing_and_deduplication_all_cases():
+    import asyncio
+    from unittest.mock import patch, AsyncMock, MagicMock
+    from datetime import datetime, timezone, date
+    from backend.app.models.tenant import Tenant
+    from backend.app.models.integration import Integration
+    from backend.app.models.financial_snapshot import FinancialSnapshot
+    from backend.app.api.v1.slack import handle_message_events, handle_app_mentions
+    from backend.app.services.slack_agent_runner import process_slack_message
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+    from langchain_core.messages import AIMessage
+
+    db = InMemoryDB()
+
+    # 1. Setup mock tenant
+    tenant = Tenant(
+        id="t-dedup-001",
+        clerk_org_id="dedup_org",
+        name="Dedup Co",
+        subscription_status="active",
+        slack_team_id="T_DEDUP_TEAM",
+    )
+    db.add(tenant)
+
+    # 2. Setup QuickBooks integration and snapshots
+    integration = Integration(
+        id="int-dedup-001",
+        tenant_id="t-dedup-001",
+        provider="quickbooks",
+        provider_connection_id="realm-dedup",
+        sync_status="active",
+        last_synced_at=datetime.now(timezone.utc),
+    )
+    db.add(integration)
+
+    pl_snap = FinancialSnapshot(
+        tenant_id="t-dedup-001",
+        snapshot_date=date.today(),
+        source="quickbooks",
+        data_type="profit_loss",
+        raw_data={"Header": {"ReportName": "ProfitAndLoss"}, "Rows": {"Row": []}},
+        period_start=date.today(),
+        period_end=date.today()
+    )
+    bs_snap = FinancialSnapshot(
+        tenant_id="t-dedup-001",
+        snapshot_date=date.today(),
+        source="quickbooks",
+        data_type="balance_sheet",
+        raw_data={"Header": {"ReportName": "BalanceSheet"}, "Rows": {"Row": []}},
+        period_start=date.today(),
+        period_end=date.today()
+    )
+    db.add(pl_snap)
+    db.add(bs_snap)
+    await db.commit()
+
+    mock_msg = AIMessage(content="CFO Analysis complete.")
+    mock_agent_result = {
+        "messages": [mock_msg],
+        "recommended_model": "claude-haiku-4-5-20251001"
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.services.slack_agent_runner._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.slack_agent_runner.agent_app.ainvoke", new_callable=AsyncMock) as mock_ainvoke, \
+         patch("backend.app.services.slack_agent_runner.SlackClient") as MockSlackClient:
+
+        mock_ainvoke.return_value = mock_agent_result
+        mock_slack = MagicMock()
+        mock_slack.send_reply = AsyncMock(return_value=True)
+        MockSlackClient.return_value = mock_slack
+
+        # Case 1: DM "What's my burn rate?"
+        dm_body = {
+            "team_id": "T_DEDUP_TEAM",
+            "event": {
+                "type": "message",
+                "channel": "D12345",
+                "channel_type": "im",
+                "user": "U_USER",
+                "text": "What's my burn rate?",
+                "ts": "10000.01"
+            }
+        }
+        await handle_message_events(dm_body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.01) # let background task run
+        
+        # Case 2: Channel top-level
+        chan_body = {
+            "team_id": "T_DEDUP_TEAM",
+            "event": {
+                "type": "message",
+                "channel": "C12345",
+                "channel_type": "channel",
+                "user": "U_USER",
+                "text": "What's my burn rate?",
+                "ts": "10000.02"
+            }
+        }
+        await handle_message_events(chan_body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.01)
+
+        # Case 3: Threaded reply, no mention
+        thread_body = {
+            "team_id": "T_DEDUP_TEAM",
+            "event": {
+                "type": "message",
+                "channel": "C12345",
+                "channel_type": "channel",
+                "user": "U_USER",
+                "text": "What's my burn rate?",
+                "ts": "10000.04",
+                "thread_ts": "10000.02"
+            }
+        }
+        await handle_message_events(thread_body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.01)
+
+        # Case 4: Channel mention (both app_mention and message events fire for ts "10000.03")
+        mention_msg_body = {
+            "team_id": "T_DEDUP_TEAM",
+            "event": {
+                "type": "message",
+                "channel": "C12345",
+                "channel_type": "channel",
+                "user": "U_USER",
+                "text": "<@bot> What's my burn rate?",
+                "ts": "10000.03"
+            }
+        }
+        mention_app_body = {
+            "team_id": "T_DEDUP_TEAM",
+            "event": {
+                "type": "app_mention",
+                "channel": "C12345",
+                "user": "U_USER",
+                "text": "<@bot> What's my burn rate?",
+                "ts": "10000.03"
+            }
+        }
+
+        # Dispatch both (they run concurrently or in sequence)
+        await handle_message_events(mention_msg_body, say=MagicMock(), logger=MagicMock())
+        await handle_app_mentions(mention_app_body, say=MagicMock(), logger=MagicMock())
+        await asyncio.sleep(0.02)
+
+        # Let's count how many times agent_app.ainvoke was called
+        # Case 1 (DM), Case 2 (channel top), Case 3 (thread), and exactly one of Case 4 (mention)
+        # Total ainvoke calls should be 4
+        assert mock_ainvoke.call_count == 4
+
+        # Verify the database records
+        # There should be exactly 4 successful agent runs
+        agent_runs = db.store.get("agent_runs", [])
+        completed_runs = [r for r in agent_runs if r.status == "completed"]
+        assert len(completed_runs) == 4
+
+        # There should be exactly 4 inbound Slack messages
+        slack_msgs = db.store.get("slack_messages", [])
+        inbound_msgs = [m for m in slack_msgs if m.direction == "inbound"]
+        assert len(inbound_msgs) == 4
+
+        # There should be exactly 4 outbound Slack messages
+        outbound_msgs = [m for m in slack_msgs if m.direction == "outbound"]
+        assert len(outbound_msgs) == 4

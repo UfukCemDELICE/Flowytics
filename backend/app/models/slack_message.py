@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import uuid4, UUID
-from sqlalchemy import Column
+from sqlalchemy import Column, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlmodel import SQLModel, Field
 
@@ -8,6 +8,9 @@ from backend.app.utils import utc_now
 
 class SlackMessage(SQLModel, table=True):
     __tablename__ = "slack_messages"
+    __table_args__ = (
+        UniqueConstraint("slack_channel_id", "slack_ts", name="uq_slack_message_channel_ts"),
+    )
     id: UUID = Field(default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True))
     tenant_id: UUID = Field(sa_column=Column(PG_UUID(as_uuid=True), nullable=False, index=True))
     direction: str  # CHECK: inbound, outbound

@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from slack_bolt.async_app import AsyncApp
@@ -10,11 +11,26 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Initialize the Bolt AsyncApp
-slack_app = AsyncApp(
-    token=settings.SLACK_BOT_TOKEN,
-    signing_secret=settings.SLACK_SIGNING_SECRET,
-    oauth_settings=None  # OAuth mode'u disable et
-)
+
+# Temporarily pop SLACK_CLIENT_ID and SLACK_CLIENT_SECRET from environment variables.
+# When both are present, Bolt's AsyncApp automatically switches to multi-team OAuth mode
+# (AsyncMultiTeamsAuthorization) and ignores the static token. We pop them here to force
+# single-team mode (AsyncSingleTeamAuthorization), then restore them for other parts of the app.
+_slack_client_id = os.environ.pop("SLACK_CLIENT_ID", None)
+_slack_client_secret = os.environ.pop("SLACK_CLIENT_SECRET", None)
+
+try:
+    slack_app = AsyncApp(
+        token=settings.SLACK_BOT_TOKEN,
+        signing_secret=settings.SLACK_SIGNING_SECRET,
+        oauth_settings=None  # Disable Bolt's built-in OAuth flow
+    )
+finally:
+    if _slack_client_id is not None:
+        os.environ["SLACK_CLIENT_ID"] = _slack_client_id
+    if _slack_client_secret is not None:
+        os.environ["SLACK_CLIENT_SECRET"] = _slack_client_secret
+
 
 # ── Block Kit Constants ─────────────────────────────────────────
 _MAX_BLOCK_TEXT = 2900  # Slack cap is 3000; leave margin for formatting

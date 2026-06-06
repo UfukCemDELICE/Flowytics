@@ -34,7 +34,7 @@ def route_query_complexity(state: AgentState) -> dict:
     if any(k in content for k in haiku_keywords_greeting) and len(content.split()) < 10:
         return {"recommended_model": "claude-haiku-4-5-20251001"}
 
-    simple_financial = ["burn rate", "runway", "cash balance", "what is my", "how much"]
+    simple_financial = ["burn rate", "runway", "cash balance", "what is my", "how much", "arr", "run rate", "annualized revenue"]
     if any(k in content for k in simple_financial) and not any(k in content for k in sonnet_keywords):
         return {"recommended_model": "claude-haiku-4-5-20251001"}
 

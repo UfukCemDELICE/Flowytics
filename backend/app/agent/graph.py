@@ -15,6 +15,7 @@ from backend.app.tools.anomaly import calculate_anomalies
 from backend.app.tools.scenario import calculate_scenario_impact
 from backend.app.tools.fundraising import calculate_fundraising_readiness
 from backend.app.tools.monthly_report import generate_monthly_report_data
+from backend.app.tools.run_rate import calculate_run_rate
 
 active_tools = [
     calculate_burn_rate,
@@ -23,7 +24,8 @@ active_tools = [
     calculate_anomalies,
     calculate_scenario_impact,
     calculate_fundraising_readiness,
-    generate_monthly_report_data
+    generate_monthly_report_data,
+    calculate_run_rate
 ]
 
 tool_node = ToolNode(active_tools)

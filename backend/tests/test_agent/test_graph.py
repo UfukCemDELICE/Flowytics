@@ -17,6 +17,12 @@ def test_route_query_complexity():
     # Haiku Triggers (Simple Financial without Sonnet keywords)
     res3 = route_query_complexity({"messages": [HumanMessage(content="Show me my runway")]})
     assert res3["recommended_model"] == "claude-haiku-4-5-20251001"
+    
+    res_arr = route_query_complexity({"messages": [HumanMessage(content="What is my ARR?")]})
+    assert res_arr["recommended_model"] == "claude-haiku-4-5-20251001"
+
+    res_run_rate = route_query_complexity({"messages": [HumanMessage(content="run rate")]})
+    assert res_run_rate["recommended_model"] == "claude-haiku-4-5-20251001"
 
     # Sonnet Triggers (Analysis/Explain/Forecast etc.)
     res4 = route_query_complexity({"messages": [HumanMessage(content="Explain my burn rate")]})

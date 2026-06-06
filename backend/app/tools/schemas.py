@@ -78,3 +78,19 @@ class FundraisingResult(BaseModel):
     readiness_score: int
     metrics: FundraisingMetrics
     gaps: list[str]
+
+class RunRateMonth(BaseModel):
+    month_start: date
+    total_revenue: Decimal
+
+class RunRateResult(BaseModel):
+    run_rate: Decimal | None
+    months_used: list[RunRateMonth]
+    month_count: int
+    low_confidence: bool
+    is_volatile: bool
+    volatility_ratio: Decimal
+    min_revenue: Decimal
+    max_revenue: Decimal
+    caveat: str
+

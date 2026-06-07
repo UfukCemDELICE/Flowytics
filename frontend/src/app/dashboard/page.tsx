@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
+import { UserButton } from "@clerk/nextjs";
 import { StripeCheckoutButton } from "@/components/StripeCheckoutButton";
 import { QuickBooksConnectButton } from "@/components/QuickBooksConnectButton";
 import { SlackConnectButton } from "@/components/SlackConnectButton";
@@ -48,7 +48,6 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="flex items-center gap-4">
-            <OrganizationSwitcher hidePersonal={true} />
             <UserButton afterSignOutUrl="/" />
           </div>
         </div>

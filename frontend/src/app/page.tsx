@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { LogoLink } from "@/components/LogoLink";
+import { NavbarAuth } from "@/components/NavbarAuth";
 
 export default async function Home() {
   const { userId } = await auth();
@@ -19,23 +20,7 @@ export default async function Home() {
             <a className="text-sm font-medium text-text-dim hover:text-primary transition-colors" href="#faq">FAQ</a>
           </div>
           <div className="flex items-center gap-4">
-            {userId ? (
-              <>
-                <Link className="hidden sm:block text-sm font-medium text-text-main hover:text-primary transition-colors" href="/dashboard">Dashboard</Link>
-                <Link className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-[0_2px_10px_rgba(37,99,235,0.2)] hover:shadow-[0_4px_15px_rgba(37,99,235,0.3)]" href="/dashboard">
-                  Go to Dashboard
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link className="hidden sm:flex text-sm font-bold text-text-main border border-surface-border hover:border-primary/50 bg-white px-5 py-2 rounded-lg transition-all items-center shadow-sm" href="/sign-in">
-                  Sign In
-                </Link>
-                <Link className="bg-primary hover:bg-primary-hover text-white px-5 py-2 rounded-lg text-sm font-bold transition-all shadow-[0_2px_10px_rgba(37,99,235,0.2)] hover:shadow-[0_4px_15px_rgba(37,99,235,0.3)]" href="/sign-up">
-                  Sign Up
-                </Link>
-              </>
-            )}
+            <NavbarAuth initialUserId={userId} />
           </div>
         </div>
       </nav>

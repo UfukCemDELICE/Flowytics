@@ -10,17 +10,7 @@ def parse_qbo_to_financial_summary(pl_data: dict, bs_data: dict) -> FinancialSum
     Parses QBO Profit & Loss and Balance Sheet JSON snapshots using Polars 
     to generate a unified FinancialSummary Pydantic model.
     """
-    # QBO data is heavily nested. For MVP, we extract the total nodes if they match standard names.
-    # A robust production version would use recursive parsing.
-    
-    pl_rows = pl_data.get("Rows", {}).get("Row", [])
-    
-    # Convert whatever we can into a Polars DataFrame for metric aggregation.
-    # In this MVP mock, we assume the backend sync service might pre-flatten the data,
-    # or we handle dummy data structure passed by our tests.
-    
-    # Dummy logic to construct standard MonthlyFinancial list
-    # Let's say we have 'monthly_data' array passed inside the snapshot metadata for ease:
+    # 1. Keep the existing "monthly_data" fallback logic for test compatibility
     if "monthly_data" in pl_data and pl_data["monthly_data"]:
         try:
             df = pl.DataFrame(pl_data["monthly_data"])
@@ -53,5 +43,121 @@ def parse_qbo_to_financial_summary(pl_data: dict, bs_data: dict) -> FinancialSum
             current_cash_balance=current_cash,
             monthly_financials=financials
         )
+
+    # 2. Real QBO parser implementation
+    pl_rows = pl_data.get("Rows", {}).get("Row", [])
+    
+    # helper to recursively find a row by group name
+    def _find_row_by_group(rows_list, group_name):
+        for r in rows_list:
+            if r.get("group") == group_name:
+                return r
+            sub_rows = r.get("Rows", {}).get("Row", [])
+            if sub_rows:
+                found = _find_row_by_group(sub_rows, group_name)
+                if found:
+                    return found
+        return None
+
+    # helper to get decimal value from row's ColData at index
+    def _get_val_at_idx(row, col_idx) -> Decimal:
+        if not row:
+            return Decimal("0")
+        col_data = row.get("Summary", {}).get("ColData", []) or row.get("ColData", [])
+        if col_idx < len(col_data):
+            val = col_data[col_idx].get("value")
+            if val is not None:
+                val_str = str(val).replace("−", "-").replace(",", "").strip()
+                if val_str == "" or val_str == "-":
+                    return Decimal("0")
+                try:
+                    return Decimal(val_str)
+                except Exception:
+                    return Decimal("0")
+        return Decimal("0")
+
+    # Columns extraction
+    columns = pl_data.get("Columns", {}).get("Column", [])
+    money_cols = []
+    
+    for idx, col in enumerate(columns):
+        col_type = col.get("ColType") or col.get("colType") or ""
+        if col_type.lower() == "money":
+            col_title = col.get("ColTitle") or col.get("colTitle") or ""
+            if col_title.lower() in ("total", "account", "row", "collapse"):
+                continue
+            
+            # Parse ColTitle e.g. "Sep 2025" using "%b %Y" format.
+            # Skip partial months like "Jun 7-30, 2024" or "Jun 1-7, 2026"
+            try:
+                dt = datetime.strptime(col_title.strip(), "%b %Y")
+                money_cols.append((idx, dt.date()))
+            except ValueError:
+                continue
+
+    if not money_cols:
+        return FinancialSummary(current_cash_balance=Decimal("0"), monthly_financials=[])
+
+    # Rows extraction for Income, Expenses, NetIncome
+    income_row = _find_row_by_group(pl_rows, "Income")
+    expenses_row = _find_row_by_group(pl_rows, "Expenses")
+    net_income_row = _find_row_by_group(pl_rows, "NetIncome")
+
+    monthly_financials = []
+    for col_idx, month_date in money_cols:
+        revenue = _get_val_at_idx(income_row, col_idx)
+        expenses = _get_val_at_idx(expenses_row, col_idx)
+        net_income = _get_val_at_idx(net_income_row, col_idx)
         
-    return FinancialSummary(current_cash_balance=Decimal("0"), monthly_financials=[])
+        monthly_financials.append(MonthlyFinancial(
+            month_start=month_date,
+            total_revenue=revenue,
+            total_expenses=expenses,
+            net_income=net_income
+        ))
+
+    monthly_financials.sort(key=lambda x: x.month_start)
+
+    # Balance Sheet extraction for current_cash_balance
+    bs_columns = bs_data.get("Columns", {}).get("Column", [])
+    bs_target_col_idx = None
+    
+    # Try to align the latest month column in BS columns
+    latest_month_date = max(money_cols, key=lambda x: x[1])[1]
+    latest_month_str = latest_month_date.strftime("%b %Y").lower()
+    for idx, col in enumerate(bs_columns):
+        title = (col.get("ColTitle") or col.get("colTitle") or "").lower()
+        if latest_month_str in title or title == latest_month_str:
+            bs_target_col_idx = idx
+            break
+
+    if bs_target_col_idx is None:
+        # Fallback to the same index as the latest money column
+        bs_target_col_idx = max(money_cols, key=lambda x: x[1])[0]
+
+    bs_rows = bs_data.get("Rows", {}).get("Row", [])
+    assets_row = _find_row_by_group(bs_rows, "Assets") or _find_row_by_group(bs_rows, "TotalAssets")
+    
+    current_cash = Decimal("0")
+    if assets_row:
+        current_assets_row = _find_row_by_group(assets_row.get("Rows", {}).get("Row", []), "CurrentAssets")
+        if current_assets_row:
+            current_cash = _get_val_at_idx(current_assets_row, bs_target_col_idx)
+            if current_cash == Decimal("0"):
+                bank_row = _find_row_by_group(current_assets_row.get("Rows", {}).get("Row", []), "BankAccounts")
+                if bank_row:
+                    current_cash = _get_val_at_idx(bank_row, bs_target_col_idx)
+    else:
+        # Fallback to searching currentassets anywhere
+        current_assets_row = _find_row_by_group(bs_rows, "CurrentAssets")
+        if current_assets_row:
+            current_cash = _get_val_at_idx(current_assets_row, bs_target_col_idx)
+            if current_cash == Decimal("0"):
+                bank_row = _find_row_by_group(current_assets_row.get("Rows", {}).get("Row", []), "BankAccounts")
+                if bank_row:
+                    current_cash = _get_val_at_idx(bank_row, bs_target_col_idx)
+
+    return FinancialSummary(
+        current_cash_balance=current_cash,
+        monthly_financials=monthly_financials
+    )

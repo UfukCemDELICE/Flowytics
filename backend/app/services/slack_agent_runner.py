@@ -191,6 +191,45 @@ async def process_slack_message(event: dict):
 
         await session.refresh(agent_run)
 
+        # Check subscription status and trial expiration
+        status = tenant.subscription_status
+        trial_expired = False
+        if tenant.trial_ends_at is not None:
+            now = utc_now()
+            if tenant.trial_ends_at.tzinfo is not None:
+                trial_expired = tenant.trial_ends_at < datetime.now(timezone.utc)
+            else:
+                trial_expired = tenant.trial_ends_at < now
+
+        if status in ("active", "trial") and trial_expired:
+            error_msg = clean_unicode_minus("Your trial has expired. Please update your payment details on the Flowytics dashboard.")
+            error_blocks = client.format_error_block(
+                title="Trial Expired",
+                message=error_msg,
+                cta=f"<{settings.FRONTEND_URL}/dashboard|Upgrade Subscription>",
+            )
+            await client.send_reply(channel, thread_ts, error_msg, blocks=error_blocks)
+            agent_run.is_successful = False
+            agent_run.status = "failed"
+            agent_run.error_message = "trial_expired"
+            await session.commit()
+            return
+            
+        elif status in ("canceled", "cancelled", "past_due", "churned"):
+            error_msg = clean_unicode_minus("Your subscription is inactive. Please update your payment details on the Flowytics dashboard.")
+            error_blocks = client.format_error_block(
+                title="Subscription Inactive",
+                message=error_msg,
+                cta=f"<{settings.FRONTEND_URL}/dashboard|Manage Billing>",
+            )
+            await client.send_reply(channel, thread_ts, error_msg, blocks=error_blocks)
+            agent_run.is_successful = False
+            agent_run.status = "failed"
+            agent_run.error_message = "subscription_inactive"
+            await session.commit()
+            return
+
+
         # Part A — Load conversation history
         is_threaded = event.get("thread_ts") is not None and event.get("thread_ts") != ts
         if is_threaded:

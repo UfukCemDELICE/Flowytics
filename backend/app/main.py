@@ -38,7 +38,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from backend.app.auth import SubscriptionGateException
+
+@app.exception_handler(SubscriptionGateException)
+async def subscription_gate_exception_handler(request: Request, exc: SubscriptionGateException) -> JSONResponse:
+    return JSONResponse(
+        status_code=402,
+        content={"error": exc.error_code}
+    )
+
 # Middleware stack (order matters: first added = outermost)
+
 _settings = get_settings()
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(CorrelationIDMiddleware)

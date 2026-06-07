@@ -103,9 +103,16 @@ async def fetch_clerk_user_name(user_id: str, secret_key: str) -> str | None:
     return None
 
 
+class SubscriptionGateException(Exception):
+    """Exception raised when a tenant's subscription/trial checks fail."""
+    def __init__(self, error_code: str):
+        self.error_code = error_code
+
+
 async def get_current_user(
     claims: dict = Depends(verify_clerk_token),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    request: Request = None
 ) -> dict:
     """Extract Clerk user ID and org ID from verified token claims. Auto-provisions a local tenant if missing."""
     # Fallback to User ID if Organization ID is missing from the token (for easy local dev)
@@ -115,6 +122,7 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="User must belong to an organization")
     
     # Auto-provision the Tenant if it doesn't exist (fixes Foreign Key errors during integrations)
+    tenant = None
     try:
         stmt = select(Tenant).where(Tenant.clerk_org_id == org_id)
         tenant = (await session.execute(stmt)).scalar_one_or_none()
@@ -156,7 +164,39 @@ async def get_current_user(
         logger = logging.getLogger(__name__)
         logger.warning(f"Could not auto-provision tenant (DB might be paused or unreachable): {e}")
     
+    if tenant and request is not None:
+        path = request.url.path
+        exempt_prefixes = [
+            "/api/v1/stripe",
+            "/api/v1/auth",
+            "/health",
+            "/api/v1/health",
+            "/api/v1/admin",
+            "/docs",
+            "/openapi.json",
+        ]
+        is_exempt = any(path.startswith(prefix) for prefix in exempt_prefixes) or path == "/"
+        
+        if not is_exempt:
+            status = tenant.subscription_status
+            trial_expired = False
+            if tenant.trial_ends_at is not None:
+                from backend.app.utils import utc_now
+                from datetime import datetime, timezone
+                now = utc_now()
+                if tenant.trial_ends_at.tzinfo is not None:
+                    trial_expired = tenant.trial_ends_at < datetime.now(timezone.utc)
+                else:
+                    trial_expired = tenant.trial_ends_at < now
+
+            if status in ("active", "trial"):
+                if trial_expired:
+                    raise SubscriptionGateException("trial_expired")
+            elif status in ("canceled", "cancelled", "past_due", "churned"):
+                raise SubscriptionGateException("subscription_inactive")
+
     return {
         "user_id": claims.get("sub"),
         "org_id": org_id
     }
+

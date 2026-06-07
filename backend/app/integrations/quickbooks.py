@@ -75,6 +75,7 @@ async def handle_callback(code: str, realm_id: str, tenant_id: str, session: Asy
         integration.credentials_encrypted = encrypted
         integration.provider_connection_id = realm_id
         integration.sync_status = "active"
+        integration.last_synced_at = None
     else:
         integration = Integration(
             tenant_id=tenant_id,
@@ -82,11 +83,31 @@ async def handle_callback(code: str, realm_id: str, tenant_id: str, session: Asy
             provider_connection_id=realm_id,
             credentials_encrypted=encrypted,
             platform_name="QuickBooks Online",
-            sync_status="active"
+            sync_status="active",
+            last_synced_at=None
         )
         session.add(integration)
     
-    await session.commit()
+    from sqlalchemy.exc import IntegrityError
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        # Silent fallback to update existing record
+        stmt = select(Integration).where(
+            Integration.tenant_id == tenant_id,
+            Integration.provider == "quickbooks"
+        )
+        result = await session.execute(stmt)
+        integration = result.scalar_one_or_none()
+        
+        if integration:
+            integration.credentials_encrypted = encrypted
+            integration.provider_connection_id = realm_id
+            integration.sync_status = "active"
+            integration.last_synced_at = None
+            await session.commit()
+        
     await session.refresh(integration)
     return integration
 

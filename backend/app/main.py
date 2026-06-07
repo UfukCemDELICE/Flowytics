@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from backend.app.api.v1 import me, quickbooks, stripe, slack
+from backend.app.api.v1 import me, quickbooks, stripe, slack, admin
 from backend.app.services.proactive_alerts import run_proactive_alerts
 from backend.app.services.monthly_report import run_monthly_reports
 from backend.app.services.sync import run_daily_qbo_sync
@@ -54,6 +54,7 @@ app.include_router(me.router, prefix="/api/v1")
 app.include_router(quickbooks.router, prefix="/api/v1")
 app.include_router(stripe.router, prefix="/api/v1")
 app.include_router(slack.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
 
 
 @app.get("/", include_in_schema=False)

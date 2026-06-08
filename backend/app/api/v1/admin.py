@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 def find_account_by_name(qb, name: str) -> Account | None:
     escaped_name = name.replace("'", "\\'")
     try:
-        results = Account.query(f"SELECT * FROM Account WHERE Name = '{escaped_name}'", qb=qb)
+        results = Account.query(f"SELECT * FROM Account WHERE Name = '{escaped_name}' AND Active IN (true, false)", qb=qb)
         if results:
             return results[0]
     except Exception as e:
@@ -60,6 +60,10 @@ def find_account_by_name(qb, name: str) -> Account | None:
 def get_or_create_account(qb, name: str, account_type: str, sub_type: str) -> Account:
     acc = find_account_by_name(qb, name)
     if acc:
+        if not acc.Active:
+            logger.info(f"Reactivating account '{acc.Name}'...")
+            acc.Active = True
+            acc.save(qb=qb)
         return acc
     
     # synonym lookup
@@ -67,21 +71,37 @@ def get_or_create_account(qb, name: str, account_type: str, sub_type: str) -> Ac
         for syn in ["Rent or Lease", "Rent Expense"]:
             acc = find_account_by_name(qb, syn)
             if acc:
+                if not acc.Active:
+                    logger.info(f"Reactivating account '{acc.Name}'...")
+                    acc.Active = True
+                    acc.save(qb=qb)
                 return acc
     elif name == "Legal & Professional":
         for syn in ["Legal & Professional Fees", "Legal and Professional", "Legal & professional fees"]:
             acc = find_account_by_name(qb, syn)
             if acc:
+                if not acc.Active:
+                    logger.info(f"Reactivating account '{acc.Name}'...")
+                    acc.Active = True
+                    acc.save(qb=qb)
                 return acc
     elif name == "Advertising":
         for syn in ["Advertising/Promotional", "Advertising Expense"]:
             acc = find_account_by_name(qb, syn)
             if acc:
+                if not acc.Active:
+                    logger.info(f"Reactivating account '{acc.Name}'...")
+                    acc.Active = True
+                    acc.save(qb=qb)
                 return acc
     elif name == "Checking":
         for syn in ["Checking (Reg)", "Checking Account", "Checking - Operating"]:
             acc = find_account_by_name(qb, syn)
             if acc:
+                if not acc.Active:
+                    logger.info(f"Reactivating account '{acc.Name}'...")
+                    acc.Active = True
+                    acc.save(qb=qb)
                 return acc
                 
     # Create new
@@ -94,16 +114,23 @@ def get_or_create_account(qb, name: str, account_type: str, sub_type: str) -> Ac
     try:
         acc.save(qb=qb)
     except Exception as e:
-        logger.error(f"Failed to save account '{name}': {e}")
-        acc = find_account_by_name(qb, name)
-        if not acc:
-            raise e
+        # Try to refetch in case it succeeded despite exception
+        refetched = find_account_by_name(qb, name)
+        if refetched:
+            return refetched
+        
+        error_msg = (
+            f"FAILED TO CREATE ACCOUNT: Name='{name}', AccountType='{account_type}', "
+            f"AccountSubType='{sub_type}'. Error: {str(e)}"
+        )
+        logger.error(error_msg)
+        raise RuntimeError(error_msg) from e
     return acc
 
 def find_item_by_name(qb, name: str) -> Item | None:
     escaped_name = name.replace("'", "\\'")
     try:
-        results = Item.query(f"SELECT * FROM Item WHERE Name = '{escaped_name}'", qb=qb)
+        results = Item.query(f"SELECT * FROM Item WHERE Name = '{escaped_name}' AND Active IN (true, false)", qb=qb)
         if results:
             return results[0]
     except Exception as e:
@@ -113,6 +140,10 @@ def find_item_by_name(qb, name: str) -> Item | None:
 def get_or_create_item(qb, name: str, income_account: Account) -> Item:
     item = find_item_by_name(qb, name)
     if item:
+        if not item.Active:
+            logger.info(f"Reactivating item '{name}'...")
+            item.Active = True
+            item.save(qb=qb)
         return item
         
     logger.info(f"Creating item '{name}' linked to account '{income_account.Name}'")
@@ -133,7 +164,7 @@ def get_or_create_item(qb, name: str, income_account: Account) -> Item:
 def find_customer_by_name(qb, name: str) -> Customer | None:
     escaped_name = name.replace("'", "\\'")
     try:
-        results = Customer.query(f"SELECT * FROM Customer WHERE DisplayName = '{escaped_name}'", qb=qb)
+        results = Customer.query(f"SELECT * FROM Customer WHERE DisplayName = '{escaped_name}' AND Active IN (true, false)", qb=qb)
         if results:
             return results[0]
     except Exception as e:
@@ -143,6 +174,10 @@ def find_customer_by_name(qb, name: str) -> Customer | None:
 def get_or_create_customer(qb, name: str) -> Customer:
     cust = find_customer_by_name(qb, name)
     if cust:
+        if not cust.Active:
+            logger.info(f"Reactivating customer '{name}'...")
+            cust.Active = True
+            cust.save(qb=qb)
         return cust
         
     logger.info(f"Creating customer '{name}'")
@@ -358,10 +393,10 @@ async def run_qbo_seed_task(tenant_id: str, realm_id: str):
         try:
             checking_account = get_or_create_account(qb, "Checking", "Bank", "Checking")
             subscription_revenue = get_or_create_account(qb, "Subscription Revenue", "Income", "SalesOfProductIncome")
-            hosting_cogs = get_or_create_account(qb, "Hosting & Inference - COGS", "Cost of Goods Sold", "OtherCostsServiceCOGS")
-            software_cloud = get_or_create_account(qb, "Software & Cloud", "Expense", "OfficeGeneralAdministrativeExpenses")
-            contractors = get_or_create_account(qb, "Contractors", "Expense", "CostOfLabor")
-            salaries_wages = get_or_create_account(qb, "Salaries & Wages", "Expense", "Wages")
+            hosting_cogs = get_or_create_account(qb, "Hosting & Inference - COGS", "Cost of Goods Sold", "SuppliesMaterialsCogs")
+            software_cloud = get_or_create_account(qb, "Software & Cloud", "Expense", "OtherMiscellaneousServiceCost")
+            contractors = get_or_create_account(qb, "Contractors", "Expense", "OtherMiscellaneousServiceCost")
+            salaries_wages = get_or_create_account(qb, "Salaries & Wages", "Expense", "PayrollExpenses")
             
             # Generic accounts synonyms/reuse
             advertising_account = get_or_create_account(qb, "Advertising", "Expense", "AdvertisingPromotional")

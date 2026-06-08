@@ -873,19 +873,6 @@ async def seed_qbo(
         logger.warning(f"Error checking P&L empty guard: {e}")
         # If reports cannot be fetched, we continue, or raise 502
         raise HTTPException(status_code=502, detail=f"Upstream QuickBooks communication failed: {str(e)}")
-        
-    # Guard 2: Idempotent-safe check
-    try:
-        purchases = Purchase.query("SELECT * FROM Purchase WHERE PrivateNote LIKE '[SEED]%'", qb=qb)
-        sales_receipts = SalesReceipt.query("SELECT * FROM SalesReceipt WHERE PrivateNote LIKE '[SEED]%'", qb=qb)
-        if purchases or sales_receipts:
-            raise HTTPException(status_code=409, detail="already seeded, run clean first")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.warning(f"Error querying existing [SEED] transactions: {e}")
-        raise HTTPException(status_code=502, detail=f"Upstream QuickBooks query failed: {str(e)}")
-        
     # Launch background task
     background_tasks.add_task(
         run_qbo_seed_task,

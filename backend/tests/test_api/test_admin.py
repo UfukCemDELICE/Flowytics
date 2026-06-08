@@ -85,10 +85,8 @@ def test_seed_qbo_books_not_empty(mock_add_task, mock_get_qbo, client: TestClien
         del app.dependency_overrides[get_session]
 
 @patch("backend.app.api.v1.admin.get_qbo_client")
-@patch("backend.app.api.v1.admin.Purchase")
-@patch("backend.app.api.v1.admin.SalesReceipt")
 @patch("fastapi.BackgroundTasks.add_task")
-def test_seed_qbo_already_seeded(mock_add_task, mock_sales_receipt, mock_purchase, mock_get_qbo, client: TestClient):
+def test_seed_qbo_success(mock_add_task, mock_get_qbo, client: TestClient):
     mock_session = AsyncMock()
     mock_integration = Integration(
         id="i-qbo-001",
@@ -107,50 +105,6 @@ def test_seed_qbo_already_seeded(mock_add_task, mock_sales_receipt, mock_purchas
     
     # Mock get_report to return empty reports
     mock_qb.get_report.return_value = {}
-    
-    # Mock queries for idempotent safety
-    mock_purchase.query.return_value = ["existing_purchase"]
-    mock_sales_receipt.query.return_value = []
-    
-    async def override_get_session():
-        yield mock_session
-        
-    app.dependency_overrides[get_session] = override_get_session
-    try:
-        resp = client.post("/api/v1/admin/qbo/seed")
-        assert resp.status_code == 409
-        assert "already seeded, run clean first" in resp.json()["detail"]
-        mock_add_task.assert_not_called()
-    finally:
-        del app.dependency_overrides[get_session]
-
-@patch("backend.app.api.v1.admin.get_qbo_client")
-@patch("backend.app.api.v1.admin.Purchase")
-@patch("backend.app.api.v1.admin.SalesReceipt")
-@patch("fastapi.BackgroundTasks.add_task")
-def test_seed_qbo_success(mock_add_task, mock_sales_receipt, mock_purchase, mock_get_qbo, client: TestClient):
-    mock_session = AsyncMock()
-    mock_integration = Integration(
-        id="i-qbo-001",
-        tenant_id="t-qbo-001",
-        provider="quickbooks",
-        provider_connection_id="realm-001"
-    )
-    
-    mock_res_integ = MagicMock()
-    mock_res_integ.scalars.return_value.first.return_value = mock_integration
-    mock_session.execute.return_value = mock_res_integ
-    
-    # Mock QBO client and its reports
-    mock_qb = MagicMock()
-    mock_get_qbo.return_value = mock_qb
-    
-    # Mock get_report to return empty reports
-    mock_qb.get_report.return_value = {}
-    
-    # Mock queries to return empty lists (not seeded yet)
-    mock_purchase.query.return_value = []
-    mock_sales_receipt.query.return_value = []
     
     async def override_get_session():
         yield mock_session

@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from decimal import Decimal
 from langchain_core.tools import tool
@@ -6,6 +7,8 @@ from backend.app.tools.burn_rate import calculate_burn_rate
 from backend.app.tools.runway import calculate_runway
 
 from backend.app.utils import clean_unicode_minus
+
+logger = logging.getLogger(__name__)
 
 @tool
 def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingResult:
@@ -81,7 +84,7 @@ def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingRes
                 if "cogs" in cat_lower or "cost of goods sold" in cat_lower or "cost of sales" in cat_lower:
                     cogs_val += amt
         total_cogs_3m += cogs_val
-        
+    logger.info(f"cogs_3m: {total_cogs_3m}")
     if total_rev_3m > 0:
         gross_margin = ((total_rev_3m - total_cogs_3m) / total_rev_3m) * Decimal("100")
         gross_margin = gross_margin.quantize(Decimal("0.01"))

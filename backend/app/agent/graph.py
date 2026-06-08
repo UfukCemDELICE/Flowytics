@@ -30,6 +30,22 @@ active_tools = [
 
 tool_node = ToolNode(active_tools)
 
+def custom_tool_node(state: AgentState) -> dict:
+    messages = state["messages"]
+    if messages:
+        last_msg = messages[-1]
+        if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+            new_tool_calls = []
+            for tc in last_msg.tool_calls:
+                tc_copy = tc.copy()
+                if "args" in tc_copy:
+                    tc_copy["args"] = tc_copy["args"].copy()
+                    if "summary" in tc_copy["args"]:
+                        tc_copy["args"]["summary"] = state["financial_summary"]
+                new_tool_calls.append(tc_copy)
+            last_msg.tool_calls = new_tool_calls
+    return tool_node(state)
+
 def load_prompt(filename: str) -> str:
     """Reads the core CFO persona configuration from the file system."""
     prompt_path = os.path.join(os.path.dirname(__file__), "prompts", filename)
@@ -92,7 +108,7 @@ workflow = StateGraph(AgentState)
 
 workflow.add_node("select_model", route_query_complexity)
 workflow.add_node("agent", call_model)
-workflow.add_node("tools", tool_node)
+workflow.add_node("tools", custom_tool_node)
 
 workflow.add_edge(START, "select_model")
 workflow.add_edge("select_model", "agent")

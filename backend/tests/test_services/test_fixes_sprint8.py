@@ -300,3 +300,94 @@ async def test_process_slack_message_maps_clerk_user_id_by_email():
             assert slack_user_maps[0].slack_user_id == "U_SPRINT8_USER"
             assert slack_user_maps[0].clerk_user_id == "user_clerk_sprint8"
             assert slack_user_maps[0].tenant_id == tenant.id
+
+
+@pytest.mark.asyncio
+async def test_process_slack_message_saves_output_result():
+    from backend.app.services.slack_agent_runner import process_slack_message
+    from backend.tests.test_e2e.test_e2e_lifecycle import InMemoryDB
+    from langchain_core.messages import AIMessage, ToolMessage
+    from backend.app.models.financial_snapshot import FinancialSnapshot
+    from backend.app.models.integration import Integration
+
+    db = InMemoryDB()
+    tenant = Tenant(
+        id="t-sprint8-002",
+        clerk_org_id="sprint8_org2",
+        name="Sprint 8 Corp 2",
+        slack_team_id="T_SPRINT8"
+    )
+    db.add(tenant)
+    
+    integration = Integration(
+        tenant_id="t-sprint8-002",
+        provider="quickbooks",
+        sync_status="active",
+        last_synced_at=datetime.now(timezone.utc)
+    )
+    db.add(integration)
+
+    pl_snap = FinancialSnapshot(
+        tenant_id="t-sprint8-002",
+        data_type="profit_loss",
+        snapshot_date=datetime.now(timezone.utc).date(),
+        source="quickbooks",
+        raw_data={"Header": {"ReportName": "ProfitAndLoss"}, "Rows": {"Row": []}}
+    )
+    bs_snap = FinancialSnapshot(
+        tenant_id="t-sprint8-002",
+        data_type="balance_sheet",
+        snapshot_date=datetime.now(timezone.utc).date(),
+        source="quickbooks",
+        raw_data={"Header": {"ReportName": "BalanceSheet"}, "Rows": {"Row": []}}
+    )
+    db.add(pl_snap)
+    db.add(bs_snap)
+    await db.commit()
+
+    slack_event = {
+        "team": "T_SPRINT8",
+        "user": "U_SPRINT8_USER",
+        "channel": "C_SPRINT8_CHANNEL",
+        "text": "hello CFO",
+        "ts": "180000.02"
+    }
+
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=db)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    mock_slack_client = MagicMock()
+    mock_slack_client.send_reply = AsyncMock()
+    mock_slack_client.format_cfo_response_block = MagicMock(return_value=[])
+
+    # AI calls tool and tool returns some structured JSON
+    ai_msg = AIMessage(content="", tool_calls=[{"name": "calculate_burn_rate", "args": {}, "id": "call_br"}])
+    tool_msg = ToolMessage(content='{"net_burn_monthly": "15000.00", "gross_burn_monthly": "20000.00", "burn_multiple": "1.5", "trend": "stable", "trend_slope": "0", "period_months": 3}', name="calculate_burn_rate", tool_call_id="call_br")
+    final_ai_msg = AIMessage(content="Your net burn is $15,000.")
+
+    mock_agent_result = {
+        "messages": [ai_msg, tool_msg, final_ai_msg]
+    }
+
+    with patch("backend.app.services.slack_agent_runner._get_engine", return_value=(None, mock_session_factory)), \
+         patch("backend.app.services.slack_agent_runner.SlackClient", return_value=mock_slack_client), \
+         patch("backend.app.services.slack_agent_runner.agent_app") as mock_agent, \
+         patch("backend.app.services.slack_agent_runner.parse_financial_summary") as mock_parse:
+         
+        mock_agent.ainvoke = AsyncMock(return_value=mock_agent_result)
+        mock_parse.return_value = MagicMock()
+
+        await process_slack_message(slack_event)
+
+        # Check agent runs table
+        agent_runs = db.store.get("agent_runs", [])
+        assert len(agent_runs) == 1
+        run = agent_runs[0]
+        assert run.is_successful is True
+        assert run.status == "completed"
+        # Verify output_result matches the parsed tool message content
+        assert run.output_result is not None
+        assert "calculate_burn_rate" in run.output_result
+        assert run.output_result["calculate_burn_rate"]["net_burn_monthly"] == "15000.00"
+        assert run.output_result["calculate_burn_rate"]["burn_multiple"] == "1.5"

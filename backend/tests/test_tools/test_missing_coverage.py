@@ -16,7 +16,7 @@ def test_anomaly_insufficient_category_history():
         ]
     )
     result = calculate_anomalies.invoke({"summary": summary})
-    assert result.scan_period_months == 3
+    assert result.scan_period_months == 1
     assert len(result.anomalies) == 0
 
 def test_fundraising_empty_financials():

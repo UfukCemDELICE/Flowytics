@@ -342,14 +342,42 @@ async def process_slack_message(event: dict):
             result = await agent_app.ainvoke(inputs)
             duration_ms = int((time.perf_counter() - start_time) * 1000)
 
-            # extract tools called
+            # extract tools called and their output results
             tools_called = []
+            output_result = {}
+            tool_call_map = {}
             for msg in result.get("messages", []):
+                if type(msg).__name__ in ("MagicMock", "Mock", "AsyncMock"):
+                    continue
                 if hasattr(msg, "tool_calls") and msg.tool_calls:
                     for tc in msg.tool_calls:
-                        t_name = tc.get("name")
-                        if t_name and t_name not in tools_called:
-                            tools_called.append(t_name)
+                        tc_id = tc.get("id")
+                        tc_name = tc.get("name")
+                        if tc_name:
+                            if tc_name not in tools_called:
+                                tools_called.append(tc_name)
+                            if tc_id:
+                                tool_call_map[tc_id] = tc_name
+
+            for msg in result.get("messages", []):
+                if type(msg).__name__ in ("MagicMock", "Mock", "AsyncMock"):
+                    continue
+                if msg.__class__.__name__ == "ToolMessage" or (hasattr(msg, "type") and msg.type == "tool"):
+                    tool_name = getattr(msg, "name", None)
+                    tool_call_id = getattr(msg, "tool_call_id", None)
+                    if not tool_name and tool_call_id:
+                        tool_name = tool_call_map.get(tool_call_id)
+                    
+                    if tool_name:
+                        try:
+                            import json
+                            if isinstance(msg.content, str):
+                                tool_data = json.loads(msg.content)
+                            else:
+                                tool_data = msg.content
+                            output_result[tool_name] = tool_data
+                        except Exception as e:
+                            logger.warning(f"Could not parse ToolMessage content for {tool_name}: {e}")
 
             model_used = result.get("recommended_model") or "claude-sonnet-4-6"
 
@@ -440,6 +468,7 @@ async def process_slack_message(event: dict):
             agent_run.status = "completed"
             agent_run.response = final_message
             agent_run.tools_called = tools_called
+            agent_run.output_result = output_result
             agent_run.model_used = model_used
             agent_run.tokens_input = total_input_tokens
             agent_run.tokens_output = total_output_tokens

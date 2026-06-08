@@ -62,6 +62,29 @@ def parse_qbo_to_financial_summary(pl_data: dict, bs_data: dict) -> FinancialSum
                     return found
         return None
 
+    # helper to recursively collect leaf accounts under a section
+    def _collect_leaf_accounts(row: dict, col_idx: int, accounts_dict: dict):
+        if not row:
+            return
+        sub_rows = row.get("Rows", {}).get("Row", [])
+        if sub_rows:
+            for r in sub_rows:
+                _collect_leaf_accounts(r, col_idx, accounts_dict)
+        
+        col_data = row.get("ColData", [])
+        if col_data:
+            name = col_data[0].get("value")
+            if name and not name.startswith("Total "):
+                if col_idx < len(col_data):
+                    val = col_data[col_idx].get("value")
+                    if val is not None:
+                        val_str = str(val).replace("−", "-").replace(",", "").strip()
+                        if val_str and val_str != "-":
+                            try:
+                                accounts_dict[name] = accounts_dict.get(name, Decimal("0")) + Decimal(val_str)
+                            except Exception:
+                                pass
+
     # helper to get decimal value from row's ColData at index
     def _get_val_at_idx(row, col_idx) -> Decimal:
         if not row:
@@ -117,13 +140,24 @@ def parse_qbo_to_financial_summary(pl_data: dict, bs_data: dict) -> FinancialSum
         total_expenses = opex + cogs + other_expenses
         net_income = _get_val_at_idx(net_income_row, col_idx)
         
+        # Extract individual account values from Expenses and COGS sections
+        category_expenses = {}
+        if expenses_row:
+            _collect_leaf_accounts(expenses_row, col_idx, category_expenses)
+        if cogs_row:
+            _collect_leaf_accounts(cogs_row, col_idx, category_expenses)
+        
+        # Fallback to COGS total if no individual accounts were found
+        if not category_expenses and cogs != 0:
+            category_expenses["COGS"] = cogs
+            
         monthly_financials.append(MonthlyFinancial(
             month_start=month_date,
             total_revenue=revenue,
             total_expenses=total_expenses,
             net_income=net_income,
             total_cogs=cogs,
-            category_expenses={"COGS": cogs}
+            category_expenses=category_expenses
         ))
 
     monthly_financials.sort(key=lambda x: x.month_start)

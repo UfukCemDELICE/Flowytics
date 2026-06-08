@@ -60,6 +60,44 @@ def _get_meta_value(metadata_list, key: str):
                 metadata_list.get(key[0].lower() + key[1:]))
     return None
 
+def _find_row_in_rows(rows_list: list, group_name: str, allowed_labels: list) -> dict | None:
+    for r in rows_list:
+        if r.get("group") == group_name:
+            return r
+        try:
+            col_data = r.get("Summary", {}).get("ColData", []) or r.get("ColData", [])
+            if col_data and col_data[0].get("value") in allowed_labels:
+                return r
+        except Exception:
+            pass
+        
+        sub_rows = r.get("Rows", {}).get("Row", [])
+        if sub_rows:
+            found = _find_row_in_rows(sub_rows, group_name, allowed_labels)
+            if found:
+                return found
+    return None
+
+def _collect_leaf_accounts(row: dict, col_idx: int, accounts_dict: dict):
+    sub_rows = row.get("Rows", {}).get("Row", [])
+    if sub_rows:
+        for r in sub_rows:
+            _collect_leaf_accounts(r, col_idx, accounts_dict)
+    
+    col_data = row.get("ColData", [])
+    if col_data:
+        name = col_data[0].get("value")
+        if name and not name.startswith("Total "):
+            if col_idx < len(col_data):
+                val = col_data[col_idx].get("value")
+                if val is not None:
+                    val_str = str(val).replace(",", "").strip()
+                    if val_str and val_str != "-":
+                        try:
+                            accounts_dict[name] = accounts_dict.get(name, Decimal("0")) + Decimal(val_str)
+                        except Exception:
+                            pass
+
 def _find_group_value_for_col(rows: list, group: str, col_idx: int) -> Decimal:
     """QBO row listesinden group adına veya label'a göre belirli kolondaki Summary değerini çıkarır."""
     group_labels = {
@@ -248,6 +286,19 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
         if total_revenue == 0 and total_expenses == 0 and net_income == 0:
             continue
             
+        # Extract individual account values from Expenses and COGS sections
+        category_expenses = {}
+        expenses_section = _find_row_in_rows(pl_rows, "Expenses", ["Expenses", "Total Expenses", "Total Expense"])
+        if expenses_section:
+            _collect_leaf_accounts(expenses_section, col_idx, category_expenses)
+        cogs_section = _find_row_in_rows(pl_rows, "COGS", ["COGS", "Cost of Goods Sold", "Total Cost of Goods Sold"])
+        if cogs_section:
+            _collect_leaf_accounts(cogs_section, col_idx, category_expenses)
+        
+        # Fallback to COGS total if no individual accounts were found
+        if not category_expenses and total_cogs != 0:
+            category_expenses["COGS"] = total_cogs
+            
         monthly_financials.append(
             MonthlyFinancial(
                 month_start=month_date,
@@ -255,7 +306,7 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
                 total_expenses=total_expenses,
                 net_income=net_income,
                 total_cogs=total_cogs,
-                category_expenses={"COGS": total_cogs}
+                category_expenses=category_expenses
             )
         )
         

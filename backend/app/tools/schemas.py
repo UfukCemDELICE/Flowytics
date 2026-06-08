@@ -48,6 +48,7 @@ class Anomaly(BaseModel):
     z_score: Decimal
     severity: Literal["warning", "critical"]
     description: str
+    month: str | None = None
 
 class AnomalyResult(BaseModel):
     anomalies: list[Anomaly]

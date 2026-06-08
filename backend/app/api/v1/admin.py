@@ -11,7 +11,8 @@ from sqlmodel import select
 from backend.app.database import get_session, _get_engine
 from backend.app.models.integration import Integration
 from backend.app.integrations.quickbooks import get_qbo_client
-from backend.app.tools.qbo_parser import parse_financial_summary
+from backend.app.tools.qbo_parser import parse_financial_summary, parse_qbo_column_date
+from backend.app.tools.schemas import FinancialSummary
 from backend.app.tools.run_rate import calculate_run_rate
 
 from quickbooks.exceptions import QuickbooksException
@@ -174,21 +175,18 @@ async def run_qbo_clean_task(tenant_id: str, realm_id: str):
             
         # 1. Delete transactions in dependency order (children first)
         deletion_order = [
-            # Round 1: Children
+            (Deposit, "Deposit"),
             (Payment, "Payment"),
             (BillPayment, "BillPayment"),
             (RefundReceipt, "RefundReceipt"),
             (CreditMemo, "CreditMemo"),
             (VendorCredit, "VendorCredit"),
-            # Round 2: Parents
             (Invoice, "Invoice"),
             (SalesReceipt, "SalesReceipt"),
             (Bill, "Bill"),
             (Purchase, "Purchase"),
-            (Deposit, "Deposit"),
             (Transfer, "Transfer"),
             (JournalEntry, "JournalEntry"),
-            # Round 3: Other
             (Estimate, "Estimate"),
             (PurchaseOrder, "PurchaseOrder"),
             (TimeActivity, "TimeActivity"),

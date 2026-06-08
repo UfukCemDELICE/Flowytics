@@ -369,15 +369,24 @@ async def process_slack_message(event: dict):
                         tool_name = tool_call_map.get(tool_call_id)
                     
                     if tool_name:
-                        try:
-                            import json
-                            if isinstance(msg.content, str):
-                                tool_data = json.loads(msg.content)
+                        content = getattr(msg, "content", "")
+                        if isinstance(content, (dict, list)):
+                            if not content:
+                                output_result[tool_name] = {"raw": str(content)}
                             else:
-                                tool_data = msg.content
-                            output_result[tool_name] = tool_data
-                        except Exception as e:
-                            logger.warning(f"Could not parse ToolMessage content for {tool_name}: {e}")
+                                output_result[tool_name] = content
+                        else:
+                            content_str = str(content)
+                            try:
+                                import json
+                                parsed = json.loads(content_str)
+                                if parsed in (None, "", {}, []):
+                                    output_result[tool_name] = {"raw": content_str or "empty_result"}
+                                else:
+                                    output_result[tool_name] = parsed
+                            except Exception as e:
+                                logger.warning(f"Could not parse ToolMessage content for {tool_name} as JSON: {e}")
+                                output_result[tool_name] = {"raw": content_str}
 
             model_used = result.get("recommended_model") or "claude-sonnet-4-6"
 

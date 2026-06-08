@@ -9,7 +9,7 @@ from backend.app.models.financial_snapshot import FinancialSnapshot
 from backend.app.models.computed_metric import ComputedMetric
 from backend.app.utils import utc_now
 
-from backend.app.tools.financial_summary import parse_qbo_to_financial_summary
+from backend.app.tools.qbo_parser import parse_financial_summary
 from backend.app.tools.burn_rate import calculate_burn_rate
 from backend.app.tools.runway import calculate_runway
 from backend.app.tools.cash_forecast import calculate_cash_forecast
@@ -61,10 +61,11 @@ async def run_daily_computed_metrics() -> None:
                     continue
                 
                 # Parse raw data into FinancialSummary
-                summary = parse_qbo_to_financial_summary.invoke({
-                    "pl_data": pl_snap.raw_data,
-                    "bs_data": bs_snap.raw_data
-                })
+                summary = parse_financial_summary(
+                    pl_snap.raw_data,
+                    bs_snap.raw_data,
+                    pl_snap.period_end or pl_snap.snapshot_date
+                )
                 
                 if not summary.monthly_financials:
                     logger.warning(f"Skipping tenant {tenant_id}: parsed financial summary has no monthly financials")

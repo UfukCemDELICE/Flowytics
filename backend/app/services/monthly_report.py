@@ -13,7 +13,7 @@ from backend.app.models.agent_run import AgentRun
 from backend.app.integrations.slack import SlackClient
 from backend.app.utils import clean_unicode_minus
 
-from backend.app.tools.financial_summary import parse_qbo_to_financial_summary
+from backend.app.tools.qbo_parser import parse_financial_summary
 from backend.app.tools.monthly_report import generate_monthly_report_data, MonthlyReportData
 
 logger = logging.getLogger(__name__)
@@ -65,10 +65,11 @@ async def run_monthly_reports(tenant_id: int | None = None):
                 if not pl_snap or not bs_snap:
                     continue
                     
-                raw_summary = parse_qbo_to_financial_summary.invoke({
-                    "pl_data": pl_snap.raw_data,
-                    "bs_data": bs_snap.raw_data
-                })
+                raw_summary = parse_financial_summary(
+                    pl_snap.raw_data,
+                    bs_snap.raw_data,
+                    pl_snap.period_end or pl_snap.snapshot_date
+                )
                 
                 if not raw_summary.monthly_financials:
                     continue

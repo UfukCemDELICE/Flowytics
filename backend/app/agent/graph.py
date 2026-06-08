@@ -65,17 +65,35 @@ def call_model(state: AgentState) -> dict:
     # 1. Base Core Prompt
     system_text = load_prompt("system_base.txt")
     if summary:
-        monthly_text = ""
-        for m in summary.monthly_financials:
-            monthly_text += (
-                f"\n- {m.month_start}: Revenue ${m.total_revenue:,.2f}, "
-                f"Expenses ${m.total_expenses:,.2f}, Net Income ${m.net_income:,.2f}"
+        num_months = len(summary.monthly_financials)
+        if num_months > 0:
+            start_date = summary.monthly_financials[0].month_start
+            end_date = summary.monthly_financials[-1].month_start
+            
+            if hasattr(start_date, "strftime"):
+                date_range = f"{start_date.strftime('%B %Y')} to {end_date.strftime('%B %Y')}"
+            else:
+                date_range = f"{start_date} to {end_date}"
+                
+            latest_month = summary.monthly_financials[-1]
+            if hasattr(latest_month.month_start, "strftime"):
+                latest_month_name = latest_month.month_start.strftime('%B %Y')
+            else:
+                latest_month_name = str(latest_month.month_start)
+                
+            system_text += (
+                f"\n\nCURRENT FINANCIAL CONTEXT:"
+                f"\nCash Balance: ${summary.current_cash_balance:,.2f}"
+                f"\nMonths of Data: {num_months}"
+                f"\nDate Range: {date_range}"
+                f"\nLatest Month ({latest_month_name}): Revenue ${latest_month.total_revenue:,.2f}, Net Income ${latest_month.net_income:,.2f}"
             )
-        system_text += (
-            f"\n\nCURRENT FINANCIAL CONTEXT:"
-            f"\nCash Balance: ${summary.current_cash_balance:,.2f}"
-            f"\nMonthly Financials:{monthly_text}"
-        )
+        else:
+            system_text += (
+                f"\n\nCURRENT FINANCIAL CONTEXT:"
+                f"\nCash Balance: ${summary.current_cash_balance:,.2f}"
+                f"\nMonths of Data: 0"
+            )
         
     # 2. Dynamic Injector (Save token bounds)
     recent_text = str([str(m.content) for m in messages[-3:]]).lower()

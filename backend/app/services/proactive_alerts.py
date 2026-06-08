@@ -10,7 +10,7 @@ from backend.app.models.integration import Integration
 from backend.app.models.financial_snapshot import FinancialSnapshot
 from backend.app.integrations.slack import SlackClient
 
-from backend.app.tools.financial_summary import parse_qbo_to_financial_summary
+from backend.app.tools.qbo_parser import parse_financial_summary
 from backend.app.tools.burn_rate import calculate_burn_rate
 from backend.app.tools.runway import calculate_runway
 from backend.app.tools.anomaly import calculate_anomalies
@@ -99,10 +99,11 @@ async def run_proactive_alerts():
                     continue
                 
                 # Setup summary
-                summary = parse_qbo_to_financial_summary.invoke({
-                    "pl_data": pl_snap.raw_data,
-                    "bs_data": bs_snap.raw_data
-                })
+                summary = parse_financial_summary(
+                    pl_snap.raw_data,
+                    bs_snap.raw_data,
+                    pl_snap.period_end or pl_snap.snapshot_date
+                )
                 
                 # Check for insufficient history
                 if not summary.monthly_financials:

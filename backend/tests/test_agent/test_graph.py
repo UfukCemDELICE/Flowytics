@@ -92,3 +92,39 @@ def test_cross_validate_ignores_years():
     res = cross_validate_math(state)
     # 2025 should be whitelisted gracefully
     assert len(res["messages"]) == 0
+
+
+def test_custom_tool_node_execution():
+    from unittest.mock import MagicMock
+    from langchain_core.runnables.config import var_child_runnable_config
+    from backend.app.agent.graph import custom_tool_node
+    from backend.app.tools.schemas import FinancialSummary
+    from decimal import Decimal
+    from langchain_core.messages import AIMessage
+    
+    summary = FinancialSummary(current_cash_balance=Decimal("100000"), monthly_financials=[])
+    ai_msg = AIMessage(
+        content="",
+        tool_calls=[{"name": "calculate_burn_rate", "args": {"summary": None}, "id": "call_1"}]
+    )
+    
+    state = {
+        "messages": [ai_msg],
+        "financial_summary": summary,
+        "recommended_model": "claude-haiku-4-5-20251001"
+    }
+    
+    config = {"configurable": {"__pregel_runtime": MagicMock()}}
+    token = var_child_runnable_config.set(config)
+    try:
+        result = custom_tool_node(state)
+    finally:
+        var_child_runnable_config.reset(token)
+    
+    assert "messages" in result
+    assert len(result["messages"]) == 1
+    tool_msg = result["messages"][0]
+    assert tool_msg.type == "tool"
+    assert tool_msg.name == "calculate_burn_rate"
+    assert ai_msg.tool_calls[0]["args"]["summary"] == summary
+

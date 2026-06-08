@@ -44,7 +44,7 @@ def custom_tool_node(state: AgentState) -> dict:
                         tc_copy["args"]["summary"] = state["financial_summary"]
                 new_tool_calls.append(tc_copy)
             last_msg.tool_calls = new_tool_calls
-    return tool_node(state)
+    return tool_node.invoke(state)
 
 def load_prompt(filename: str) -> str:
     """Reads the core CFO persona configuration from the file system."""

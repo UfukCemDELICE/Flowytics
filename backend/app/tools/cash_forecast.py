@@ -11,7 +11,12 @@ def calculate_cash_forecast(summary: FinancialSummary) -> CashForecastResult:
     Calculates a 13-week cash projection. 
     In the absence of weekly raw data, we extrapolate trends from the monthly financials.
     """
-    financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
+    today = date.today()
+    sorted_financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
+    financials = [
+        m for m in sorted_financials
+        if not (m.month_start.year == today.year and m.month_start.month == today.month)
+    ]
     if not financials:
         # Provide flat zero forecast if no data
         return clean_unicode_minus(CashForecastResult(weeks=[], zero_cash_week=None))

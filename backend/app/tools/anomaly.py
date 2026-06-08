@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from collections import defaultdict
 import statistics
@@ -13,7 +14,12 @@ def calculate_anomalies(summary: FinancialSummary) -> AnomalyResult:
     |Z-score| > 2.0 triggers a warning.
     |Z-score| > 3.0 triggers a critical.
     """
-    financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
+    today = date.today()
+    sorted_financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
+    financials = [
+        m for m in sorted_financials
+        if not (m.month_start.year == today.year and m.month_start.month == today.month)
+    ]
     if len(financials) < 3:
         # Cannot calculate Z-score reliably with fewer than 3 months of data
         return clean_unicode_minus(AnomalyResult(anomalies=[], scan_period_months=len(financials)))

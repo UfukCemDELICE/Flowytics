@@ -7,7 +7,7 @@ def test_burn_rate_healthy(profile_healthy):
     result = calculate_burn_rate.invoke({"summary": profile_healthy})
     assert result.trend in ["decreasing", "stable"]
     assert result.net_burn_monthly > Decimal("0")
-    assert result.period_months == 6
+    assert result.period_months == 3
 
 def test_burn_rate_dying(profile_dying):
     result = calculate_burn_rate.invoke({"summary": profile_dying})

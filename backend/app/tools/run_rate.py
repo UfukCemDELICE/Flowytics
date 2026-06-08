@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from langchain_core.tools import tool
 from backend.app.tools.schemas import FinancialSummary, RunRateResult, RunRateMonth
@@ -9,8 +10,13 @@ def calculate_run_rate(summary: FinancialSummary) -> RunRateResult:
     """
     Calculates the annualized run rate (ARR proxy) based on the most recent 3 months of populated revenue data.
     """
+    today = date.today()
     sorted_financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
-    revenue_months = [m for m in sorted_financials if m.total_revenue > 0]
+    full_months = [
+        m for m in sorted_financials
+        if not (m.month_start.year == today.year and m.month_start.month == today.month)
+    ]
+    revenue_months = [m for m in full_months if m.total_revenue > 0]
     
     # Take the last 3 entries of revenue_months
     selected_months = revenue_months[-3:]

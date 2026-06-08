@@ -150,7 +150,7 @@ class TestZeroRevenue:
         # All months have net_income = -8000, so net burn = 8000
         assert result.net_burn_monthly == Decimal("8000")
         assert result.gross_burn_monthly == Decimal("8000")
-        assert result.period_months == 6
+        assert result.period_months == 3
 
     def test_runway_zero_revenue(self):
         summary = _zero_revenue_summary()

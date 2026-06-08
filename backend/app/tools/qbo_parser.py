@@ -215,6 +215,7 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
         total_revenue = _find_group_value_for_col(pl_rows, "Income", 1) + _find_group_value_for_col(pl_rows, "OtherIncome", 1)
         total_expenses = _find_group_value_for_col(pl_rows, "Expenses", 1) + _find_group_value_for_col(pl_rows, "COGS", 1) + _find_group_value_for_col(pl_rows, "OtherExpenses", 1)
         net_income = _find_group_value_for_col(pl_rows, "NetIncome", 1)
+        total_cogs = _find_group_value_for_col(pl_rows, "COGS", 1)
         current_cash = _find_bank_total_for_col(bs_rows, 1)
 
         monthly = MonthlyFinancial(
@@ -222,6 +223,8 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
             total_revenue=total_revenue,
             total_expenses=total_expenses,
             net_income=net_income,
+            total_cogs=total_cogs,
+            category_expenses={"COGS": total_cogs}
         )
 
         monthly_financials = []
@@ -239,6 +242,7 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
         total_revenue = _find_group_value_for_col(pl_rows, "Income", col_idx) + _find_group_value_for_col(pl_rows, "OtherIncome", col_idx)
         total_expenses = _find_group_value_for_col(pl_rows, "Expenses", col_idx) + _find_group_value_for_col(pl_rows, "COGS", col_idx) + _find_group_value_for_col(pl_rows, "OtherExpenses", col_idx)
         net_income = _find_group_value_for_col(pl_rows, "NetIncome", col_idx)
+        total_cogs = _find_group_value_for_col(pl_rows, "COGS", col_idx)
         
         # Skip months where total_revenue, total_expenses, and net_income are all 0/empty
         if total_revenue == 0 and total_expenses == 0 and net_income == 0:
@@ -250,6 +254,8 @@ def parse_financial_summary(pl_data: dict, bs_data: dict, period_end: date) -> F
                 total_revenue=total_revenue,
                 total_expenses=total_expenses,
                 net_income=net_income,
+                total_cogs=total_cogs,
+                category_expenses={"COGS": total_cogs}
             )
         )
         

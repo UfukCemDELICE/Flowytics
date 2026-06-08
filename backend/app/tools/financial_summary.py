@@ -24,6 +24,7 @@ def parse_qbo_to_financial_summary(pl_data: dict, bs_data: dict) -> FinancialSum
                 revenue = Decimal(str(row.get("revenue", "0") or "0"))
                 expenses = Decimal(str(row.get("expenses", "0") or "0"))
                 net_income = Decimal(str(row.get("net_income", "0") or "0"))
+                cogs = Decimal(str(row.get("cogs", "0") or "0"))
                 month_str = row.get("month", "")
                 if not month_str:
                     continue
@@ -31,7 +32,9 @@ def parse_qbo_to_financial_summary(pl_data: dict, bs_data: dict) -> FinancialSum
                     month_start=datetime.strptime(month_str, "%Y-%m").date(),
                     total_revenue=revenue,
                     total_expenses=expenses,
-                    net_income=net_income
+                    net_income=net_income,
+                    total_cogs=cogs,
+                    category_expenses={"COGS": cogs}
                 ))
             except (ValueError, TypeError, KeyError):
                 # Skip malformed rows rather than crashing the entire parse
@@ -98,22 +101,29 @@ def parse_qbo_to_financial_summary(pl_data: dict, bs_data: dict) -> FinancialSum
     if not money_cols:
         return FinancialSummary(current_cash_balance=Decimal("0"), monthly_financials=[])
 
-    # Rows extraction for Income, Expenses, NetIncome
+    # Rows extraction for Income, Expenses, NetIncome, COGS, OtherExpenses
     income_row = _find_row_by_group(pl_rows, "Income")
     expenses_row = _find_row_by_group(pl_rows, "Expenses")
     net_income_row = _find_row_by_group(pl_rows, "NetIncome")
+    cogs_row = _find_row_by_group(pl_rows, "COGS")
+    other_expenses_row = _find_row_by_group(pl_rows, "OtherExpenses")
 
     monthly_financials = []
     for col_idx, month_date in money_cols:
         revenue = _get_val_at_idx(income_row, col_idx)
-        expenses = _get_val_at_idx(expenses_row, col_idx)
+        cogs = _get_val_at_idx(cogs_row, col_idx)
+        opex = _get_val_at_idx(expenses_row, col_idx)
+        other_expenses = _get_val_at_idx(other_expenses_row, col_idx)
+        total_expenses = opex + cogs + other_expenses
         net_income = _get_val_at_idx(net_income_row, col_idx)
         
         monthly_financials.append(MonthlyFinancial(
             month_start=month_date,
             total_revenue=revenue,
-            total_expenses=expenses,
-            net_income=net_income
+            total_expenses=total_expenses,
+            net_income=net_income,
+            total_cogs=cogs,
+            category_expenses={"COGS": cogs}
         ))
 
     monthly_financials.sort(key=lambda x: x.month_start)

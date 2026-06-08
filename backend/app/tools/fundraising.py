@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from langchain_core.tools import tool
 from backend.app.tools.schemas import FinancialSummary, FundraisingResult, FundraisingMetrics
@@ -12,7 +13,12 @@ def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingRes
     Analyzes historical startup financials to calculate investor readiness metrics
     and generates a score out of 100 based on standard seed/series-A benchmarks.
     """
-    financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
+    today = date.today()
+    sorted_financials = sorted(summary.monthly_financials, key=lambda x: x.month_start)
+    financials = [
+        m for m in sorted_financials
+        if not (m.month_start.year == today.year and m.month_start.month == today.month)
+    ]
     if not financials:
         return clean_unicode_minus(FundraisingResult(
             readiness_score=0, 
@@ -20,8 +26,27 @@ def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingRes
             gaps=["No financial history found."]
         ))
 
-    recent = financials[-1]
-    prev = financials[-2] if len(financials) > 1 else None
+    # Exclude leading zero-revenue months for active window
+    first_rev_idx = None
+    for idx, m in enumerate(financials):
+        if m.total_revenue > 0:
+            first_rev_idx = idx
+            break
+            
+    if first_rev_idx is not None:
+        active_months = financials[first_rev_idx:]
+    else:
+        active_months = financials
+
+    if not active_months:
+        return clean_unicode_minus(FundraisingResult(
+            readiness_score=0, 
+            metrics=FundraisingMetrics(mrr=None, mrr_growth_rate=None, arr=None, burn_multiple=None, runway_months=Decimal("0"), gross_margin=None), 
+            gaps=["No financial history found."]
+        ))
+
+    recent = active_months[-1]
+    prev = active_months[-2] if len(active_months) > 1 else None
     
     mrr = recent.total_revenue
     arr = mrr * Decimal("12")
@@ -39,14 +64,29 @@ def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingRes
     runway_months = runway_res.runway_months
     
     # Calculate Capital Efficiency (Burn Multiple = Net Burn / Net New ARR)
-    net_burn = burn_result.net_burn_monthly
+    # We now reuse the correct burn_multiple calculated over the full active period from calculate_burn_rate.
+    burn_multiple = burn_result.burn_multiple
+
+    # Calculate real gross margin over the most recent 3 full months
+    recent_3 = active_months[-3:]
+    total_rev_3m = sum(m.total_revenue for m in recent_3)
     
-    if prev and mrr_growth_rate and mrr_growth_rate > Decimal("0"):
-        net_new_arr = (mrr - prev.total_revenue) * Decimal("12")
-        burn_multiple = net_burn / net_new_arr if net_new_arr > 0 else Decimal("99.9")
-        burn_multiple = burn_multiple.quantize(Decimal("0.01"))
+    total_cogs_3m = Decimal("0")
+    for m in recent_3:
+        cogs_val = getattr(m, "total_cogs", Decimal("0"))
+        if cogs_val == Decimal("0") and m.category_expenses:
+            # Fallback to category_expenses
+            for cat, amt in m.category_expenses.items():
+                cat_lower = cat.lower()
+                if "cogs" in cat_lower or "cost of goods sold" in cat_lower or "cost of sales" in cat_lower:
+                    cogs_val += amt
+        total_cogs_3m += cogs_val
+        
+    if total_rev_3m > 0:
+        gross_margin = ((total_rev_3m - total_cogs_3m) / total_rev_3m) * Decimal("100")
+        gross_margin = gross_margin.quantize(Decimal("0.01"))
     else:
-        burn_multiple = None
+        gross_margin = None
         
     score = 0
     gaps = []
@@ -71,6 +111,13 @@ def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingRes
         burn_str = f"{burn_multiple}x" if burn_multiple is not None else "Unknown"
         gaps.append(f"Burn multiple is '{burn_str}'. Target < 2.0x to prove capital efficiency.")
         
+    # Evaluate Gross Margin threshold checks
+    if gross_margin is not None:
+        if gross_margin >= Decimal("60"):
+            score += 0  # optional bump
+        else:
+            gaps.append(f"Gross margin is '{gross_margin}%'. Seed investors target > 60% for venture-scale software startups.")
+
     # Baseline existence of revenue
     if mrr > Decimal("0"):
         score += 15
@@ -87,7 +134,7 @@ def calculate_fundraising_readiness(summary: FinancialSummary) -> FundraisingRes
             arr=arr,
             burn_multiple=burn_multiple,
             runway_months=runway_months,
-            gross_margin=None # MVP excludes COGS from raw QBO mappings
+            gross_margin=gross_margin
         ),
         gaps=gaps
     ))

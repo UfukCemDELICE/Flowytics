@@ -9,6 +9,7 @@ class MonthlyFinancial(BaseModel):
     total_revenue: Decimal
     total_expenses: Decimal
     net_income: Decimal
+    total_cogs: Decimal = Decimal("0")
     category_expenses: dict[str, Decimal] = Field(default_factory=dict)
 
 class BurnRateResult(BaseModel):

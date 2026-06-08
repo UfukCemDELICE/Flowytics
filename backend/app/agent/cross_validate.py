@@ -1,3 +1,4 @@
+# DISABLED: replaced by authoritative-data injection in custom_tool_node. Kept for reference; produced false positives (flagged legitimate tool numbers as hallucinations).
 import re
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from backend.app.agent.state import AgentState

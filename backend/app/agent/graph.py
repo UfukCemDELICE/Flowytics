@@ -6,7 +6,7 @@ from langgraph.prebuilt import ToolNode
 
 from backend.app.agent.state import AgentState
 from backend.app.agent.select_model import route_query_complexity
-from backend.app.agent.cross_validate import cross_validate_math, validation_edge
+# from backend.app.agent.cross_validate import cross_validate_math, validation_edge
 
 from backend.app.tools.burn_rate import calculate_burn_rate
 from backend.app.tools.runway import calculate_runway

@@ -35,6 +35,29 @@ async def _background_first_sync(tenant_id: UUID):
             logger.error(f"Auto first-sync failed for tenant {tenant_id}: {e}")
 
 
+async def _initial_tenant_sync(tenant_id: UUID):
+    """Background task: pull initial QBO data and calculate computed metrics."""
+    from backend.app.database import _get_engine
+    from backend.app.services.computed_metrics import run_daily_computed_metrics
+    from backend.app.services.onboarding_welcome import send_welcome_message_if_ready
+
+    _, session_factory = _get_engine()
+    try:
+        async with session_factory() as bg_session:
+            result = await sync_tenant(tenant_id, bg_session)
+            logger.info(f"Auto first-sync completed for tenant {tenant_id}: {result}")
+
+        # Chain computed metrics calculation
+        await run_daily_computed_metrics()
+        logger.info(f"Computed metrics completed after initial sync for tenant {tenant_id}")
+
+        async with session_factory() as bg_session:
+            # Check if all onboarding milestones are met → send welcome
+            await send_welcome_message_if_ready(tenant_id, bg_session)
+    except Exception as e:
+        logger.exception(f"Initial tenant sync background task failed for tenant {tenant_id}: {e}")
+
+
 @router.get("/auth")
 async def get_auth_url(user: dict = Depends(get_current_user)):
     """Return QuickBooks OAuth URL."""
@@ -75,7 +98,7 @@ async def oauth_callback(
 
         await quickbooks.handle_callback(code, realmId, tenant.id, session)
         # Fire background sync — user sees dashboard instantly, data populates async
-        asyncio.create_task(_background_first_sync(tenant.id))
+        asyncio.create_task(_initial_tenant_sync(tenant.id))
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard")
     except quickbooks.IntegrationError as e:
         logger.error(f"QBO callback upstream error: {e}")

@@ -66,10 +66,10 @@ def test_quickbooks_callback_upsert_logic(client: TestClient):
     mock_client.expires_in = 3600
     mock_client.x_refresh_token_expires_in = 8726400
 
-    # Mock background first sync
+    # Mock background initial sync
     with patch("backend.app.api.v1.quickbooks.quickbooks.get_auth_client", return_value=mock_client), \
          patch("backend.app.api.v1.quickbooks.quickbooks.get_fernet") as mock_fernet, \
-         patch("backend.app.api.v1.quickbooks._background_first_sync", new_callable=AsyncMock) as mock_sync:
+         patch("backend.app.api.v1.quickbooks._initial_tenant_sync", new_callable=AsyncMock) as mock_sync:
         
         mock_f = MagicMock()
         mock_f.encrypt.side_effect = lambda x: b"encrypted_" + x
@@ -155,7 +155,7 @@ def test_quickbooks_callback_integrity_error_upsert_fallback(client: TestClient)
 
     with patch("backend.app.api.v1.quickbooks.quickbooks.get_auth_client", return_value=mock_client), \
          patch("backend.app.api.v1.quickbooks.quickbooks.get_fernet") as mock_fernet, \
-         patch("backend.app.api.v1.quickbooks._background_first_sync", new_callable=AsyncMock) as mock_sync:
+         patch("backend.app.api.v1.quickbooks._initial_tenant_sync", new_callable=AsyncMock) as mock_sync:
         
         mock_f = MagicMock()
         mock_f.encrypt.side_effect = lambda x: b"encrypted_" + x

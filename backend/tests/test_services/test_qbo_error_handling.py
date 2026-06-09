@@ -232,3 +232,44 @@ async def test_background_first_sync_handles_failure_gracefully():
             mock_sync.side_effect = Exception("QBO is down")
             # Should NOT raise
             await _background_first_sync("org-123")
+
+
+@pytest.mark.asyncio
+async def test_initial_tenant_sync_calls_sync_and_metrics():
+    """_initial_tenant_sync should call sync_tenant and run_daily_computed_metrics."""
+    from backend.app.api.v1.quickbooks import _initial_tenant_sync
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)):
+        with patch("backend.app.api.v1.quickbooks.sync_tenant", new_callable=AsyncMock) as mock_sync, \
+             patch("backend.app.services.computed_metrics.run_daily_computed_metrics", new_callable=AsyncMock) as mock_metrics, \
+             patch("backend.app.services.onboarding_welcome.send_welcome_message_if_ready", new_callable=AsyncMock) as mock_welcome:
+            
+            mock_sync.return_value = {"status": "synced", "snapshots_created": 3}
+            await _initial_tenant_sync("org-123")
+            
+            mock_sync.assert_awaited_once_with("org-123", mock_session)
+            mock_metrics.assert_awaited_once()
+            mock_welcome.assert_awaited_once_with("org-123", mock_session)
+
+
+@pytest.mark.asyncio
+async def test_initial_tenant_sync_handles_failure_gracefully():
+    """_initial_tenant_sync must not raise even if sync_tenant or computed metrics fails."""
+    from backend.app.api.v1.quickbooks import _initial_tenant_sync
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.app.database._get_engine", return_value=(None, mock_session_factory)):
+        with patch("backend.app.api.v1.quickbooks.sync_tenant", new_callable=AsyncMock) as mock_sync:
+            mock_sync.side_effect = Exception("QBO API is down")
+            # Should NOT raise
+            await _initial_tenant_sync("org-123")
+

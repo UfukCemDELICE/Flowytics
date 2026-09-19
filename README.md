@@ -1,4 +1,4 @@
-# Flowytics — Agentic CFO [Watch my Loom video](https://www.loom.com/share/16d5c70a57634b668928355aebae212d)
+# Flowytics — Agentic CFO [Demo Loom Video](https://www.loom.com/share/16d5c70a57634b668928355aebae212d)
 
 Flowytics is an AI-powered managerial accounting application designed specifically for founders. Instead of paying thousands of dollars a month for a fractional CFO to analyze Quickbooks and tell you your runway, Flowytics connects directly to your financial tooling and proactively alerts you via Slack using an autonomous LangGraph agent.
 

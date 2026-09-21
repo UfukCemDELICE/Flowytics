@@ -11,11 +11,10 @@ Flowytics is an AI-powered managerial accounting application designed specifical
     - **QuickBooks Online:** OAuth flow complete. Financial sync engine (`services/sync.py`) can pull P&L, Balance Sheet, and Cash Flow into JSON snapshots.
     - **Slack:** OAuth and Events API listener mapped for proactive agent responses.
 
-- **Sprint 2 (Deterministic Tools): UP NEXT ⏳**
+- **Sprint 2 (Deterministic Tools): COMPLETE ✅**
   - The core mathematical functions (`burn_rate`, `runway`, `cash_forecast`). 
-  - (These must be built before the AI Agent so the LLM has tools to call).
 
-- **Sprint 3 (LangGraph AI Agent): PLANNED 📅**
+- **Sprint 3 (LangGraph AI Agent): COMPLETE ✅**
   - The ReAct loop routing user questions to the Python math tools. 
 
 ## Technology Architecture
